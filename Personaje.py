@@ -1,15 +1,22 @@
-import pygame
-import Constantes
+import pygame       # Importa la librería pygame
+import Constantes   # Importa nuestro archivo de constantes
 
+class Personaje():                          # Define la clase Personaje
+    def __init__(self, x, y):              # Constructor: se ejecuta al crear el personaje
+        self.shape = pygame.Rect(          # self → este objeto | shape → su forma/caja
+            0, 0,                          # Posición inicial temporal (x=0, y=0)
+            Constantes.WIDTH_PERSONAJE,    # Ancho del rectángulo
+            Constantes.HEIGHT_PERSONAJE    # Alto del rectángulo
+        )
+        self.shape.center = (x, y)         # Recoloca el rectángulo para que su centro quede en (x,y)
 
-class Personaje():
-    def __init__(self,x,y):
-        self.shape=pygame.Rect(0,0,Constantes.WIDTH_PERSONAJE,Constantes.HEIGHT_PERSONAJE)
-        self.shape.center=(x,y)
+    def draw(self, interfaz):              # Método para dibujar el personaje
+        pygame.draw.rect(                  # pygame → librería | draw → módulo de dibujo | rect → dibuja rectángulo
+            interfaz,                      # Superficie donde dibujar (la ventana)
+            Constantes.COLOR_PERSONAJE,    # Color del rectángulo
+            self.shape                     # El rectángulo a dibujar
+        )
 
-    def draw(self,interfaz):
-        pygame.draw.rect(interfaz,Constantes.COLOR_PERSONAJE,self.shape)
-
-    def movimiento(self,delt_x,delt_y):
-        self.shape.x+=delt_x
-        self.shape.y+=delt_y
+    def movimiento(self, delt_x, delt_y):  # Método para mover el personaje
+        self.shape.x += delt_x             # Suma el desplazamiento horizontal a la posición X
+        self.shape.y += delt_y             # Suma el desplazamiento vertical a la posición Y
