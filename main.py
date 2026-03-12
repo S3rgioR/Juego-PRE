@@ -12,8 +12,7 @@ pygame.display.set_caption("Juego")         # display → módulo de pantalla | 
 
 
 def main():                    # Define la función principal del juego
-    mover_arriba = False       # Bandera: indica si la tecla W está pulsada
-    mover_abajo = False        # Bandera: indica si la tecla S está pulsada
+
     mover_derecha = False      # Bandera: indica si la tecla D está pulsada
     mover_izquierda = False    # Bandera: indica si la tecla A está pulsada
 
@@ -33,12 +32,9 @@ def main():                    # Define la función principal del juego
             delta_x = Constantes.VELOCIDAD     # Mover derecha → X positiva
         if mover_izquierda == True:
             delta_x = -Constantes.VELOCIDAD    # Mover izquierda → X negativa
-        if mover_abajo == True:
-            delta_y = Constantes.VELOCIDAD     # Mover abajo → Y positiva (en pantalla, Y crece hacia abajo)
-        if mover_arriba == True:
-            delta_y = -Constantes.VELOCIDAD    # Mover arriba → Y negativa
 
-        jugador.movimiento(delta_x, delta_y)   # Aplica el desplazamiento calculado al personaje
+
+        jugador.movimiento(delta_x,0)   # Aplica el desplazamiento calculado al personaje
         jugador.draw(Ventana)                  # Dibuja el personaje en la ventana
 
         for event in pygame.event.get():       # Obtiene todos los eventos ocurridos y los recorre uno a uno
@@ -50,20 +46,15 @@ def main():                    # Define la función principal del juego
                     mover_izquierda = True     # Activa la bandera de moverse a la izquierda
                 if event.key == pygame.K_d:
                     mover_derecha = True
-                if event.key == pygame.K_w:
-                    mover_arriba = True
-                if event.key == pygame.K_s:
-                    mover_abajo = True
+                if event.key == pygame.K_SPACE:    # Espacio → saltar
+                    jugador.saltar()
 
             if event.type == pygame.KEYUP:     # Si el evento es soltar una tecla
                 if event.key == pygame.K_a:    # Si esa tecla es la A
                     mover_izquierda = False    # Desactiva la bandera
                 if event.key == pygame.K_d:
                     mover_derecha = False
-                if event.key == pygame.K_w:
-                    mover_arriba = False
-                if event.key == pygame.K_s:
-                    mover_abajo = False
+
 
         pygame.display.update()   # display → pantalla | update → actualiza la ventana mostrando todo lo dibujado este fotograma
 

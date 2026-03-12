@@ -14,3 +14,8 @@ VELOCIDAD = 10                # Píxeles que se mueve el personaje por fotograma
 
 #-------- FONDO--------#
 COLOR_FONDO = (0, 100, 100)   # Color del fondo en RGB → verde azulado
+
+#-------- FISICA --------#
+GRAVEDAD = 0.5        # Cuánto aumenta la velocidad de caída cada fotograma
+FUERZA_SALTO = -12    # Velocidad vertical al saltar (negativa = hacia arriba)
+VELOCIDAD_MAX_CAIDA = 20  # Límite de velocidad de caída (para que no caiga infinitamente rápido)
