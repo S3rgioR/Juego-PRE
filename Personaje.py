@@ -2,20 +2,32 @@ import pygame       # Importa la librería pygame
 import Constantes   # Importa nuestro archivo de constantes
 
 class Personaje():                          # Define la clase Personaje
-    def __init__(self, x, y,animaciones):              # Constructor: se ejecuta al crear el personaje
+    def __init__(self, x, y,animaciones_idle, animaciones_walk,animaciones_jump):              # Constructor: se ejecuta al crear el personaje
+        ### Atributos ###
+
         self.shape = pygame.Rect(          # self → este objeto | shape → su forma/caja
             0, 0,                          # Posición inicial temporal (x=0, y=0)
             Constantes.WIDTH_PERSONAJE,    # Ancho del rectángulo
             Constantes.HEIGHT_PERSONAJE    # Alto del rectángulo
         )
+
         self.shape.center = (x, y)         # Recoloca el rectángulo para que su centro quede en (x,y)
-        self.animaciones = animaciones
+
+        # Animaciones
+        self.animaciones_idle = animaciones_idle
+        self.animaciones_walk = animaciones_walk
+        self.animaciones = animaciones_idle  # empieza en idle
+        self.moviendose = False  # nueva bandera
+        self.animaciones_jump = animaciones_jump
+
+        # Movimiento/Tiempo
         self.frame_index = 0
         self.update_time = pygame.time.get_ticks()
-        self.image = animaciones[self.frame_index]
+        self.image = self.animaciones[self.frame_index]
         self.flip = False
         self.velocidad_y = 0
         self.en_suelo =False
+
     def update(self):
         cooldown_animacion =100
         self.image = self.animaciones[self.frame_index]
@@ -24,6 +36,7 @@ class Personaje():                          # Define la clase Personaje
             self.update_time = pygame.time.get_ticks()
         if self.frame_index >= len(self.animaciones):
             self.frame_index = 0
+
     def draw(self, interfaz):              # Método para dibujar el personaje
         imagen_flip = pygame.transform.flip(self.image, self.flip, False)
         img_rect = imagen_flip.get_rect(midbottom=self.shape.midbottom)
@@ -42,11 +55,28 @@ class Personaje():                          # Define la clase Personaje
     def movimiento(self, delt_x, delt_y):  # Método para mover el personaje
         if delt_x < 0:
             self.flip= True
-        if delt_x > 0:
+            self.moviendose = True
+        elif delt_x > 0:
             self.flip= False
+            self.moviendose = True
+        else:
+            self.moviendose = False
         self.shape.x += delt_x             # Suma el desplazamiento horizontal a la posición X
 
+        # Cambia el set de animaciones según el estado
+        nueva_anim = self.animaciones_walk if self.moviendose else self.animaciones_idle
+        if not self.en_suelo:
+            nueva_anim = self.animaciones_jump
+        elif self.moviendose:
+            nueva_anim = self.animaciones_walk
+        else:
+            nueva_anim = self.animaciones_idle
+
+        if nueva_anim != self.animaciones:  # solo resetea si cambia de estado
+            self.animaciones = nueva_anim
+            self.frame_index = 0  # reinicia para no saltar a un frame inexistente
         # Colisión con borde izquierdo
+
         if self.shape.left < 0:
             self.shape.left = 0
 

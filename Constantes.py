@@ -7,11 +7,13 @@ HEIGHT = 720       # Alto de la ventana en píxeles
 FPS = 60           # Fotogramas por segundo (velocidad del juego)
 
 #-------- PERSONAJE--------#
-WIDTH_PERSONAJE = 21          # Ancho del rectángulo del personaje en píxeles
-HEIGHT_PERSONAJE = 40         # Alto del rectángulo del personaje en píxeles
+image = pygame.image.load("Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png")
+SCALA_PERSONAJE = 1.5
+WIDTH_PERSONAJE = image.get_width()*0.1*SCALA_PERSONAJE          # Ancho del rectángulo del personaje en píxeles
+HEIGHT_PERSONAJE = image.get_height()*0.35*SCALA_PERSONAJE         # Alto del rectángulo del personaje en píxeles
 COLOR_PERSONAJE = (255, 0, 255)  # Color del personaje en RGB → magenta
 VELOCIDAD = 10                # Píxeles que se mueve el personaje por fotograma
-SCALA_PERSONAJE = 0.9
+
 
 #-------- FONDO--------#
 COLOR_FONDO = (0, 100, 100)   # Color del fondo en RGB → verde azulado

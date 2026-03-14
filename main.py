@@ -15,15 +15,29 @@ def escalar_img(image,scale):
     layer_image = pygame.transform.scale(image, (w * scale,
                                                         h * scale))
     return layer_image
-animaciones =[]
-for i in range(12):
-    img = pygame.image.load(f"Assets/Characters/Run/frame{i+1}.png")
-    img = escalar_img(img,Constantes.SCALA_PERSONAJE)
-    animaciones.append(img)
 
-player_image=pygame.image.load("Assets/Characters/Run/frame1.png")
-player_image = escalar_img(player_image,Constantes.SCALA_PERSONAJE)
-jugador = Personaje(250, 250,animaciones)    # Crea un Personaje con el centro en la posición (250, 250)
+# Animaciones idle (ya las tienes)
+animaciones_idle = []
+for i in range(4):
+    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/Idle/frame{i+1}.png")
+    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
+    animaciones_idle.append(img)
+
+# Animaciones de caminar (ajusta la ruta y el número de frames a tus sprites)
+animaciones_walk = []
+for i in range(12):  # cambia 6 por el número de frames que tengas
+    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/Run/frame{i+1}.png")
+    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
+    animaciones_walk.append(img)
+
+animaciones_jump = []
+for i in range(4):  # ajusta el número de frames
+    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/Jump/Jump{i+1}.png")
+    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
+    animaciones_jump.append(img)
+
+# Pasa ambas listas al personaje
+jugador = Personaje(250, 250, animaciones_idle, animaciones_walk,animaciones_jump)
 
 def main():                    # Define la función principal del juego
 
