@@ -5,20 +5,18 @@ class Personaje():                          # Define la clase Personaje
     def __init__(self, x, y,animaciones_idle, animaciones_walk,animaciones_jump):              # Constructor: se ejecuta al crear el personaje
         ### Atributos ###
 
-        self.shape = pygame.Rect(          # self → este objeto | shape → su forma/caja
-            0, 0,                          # Posición inicial temporal (x=0, y=0)
-            Constantes.WIDTH_PERSONAJE,    # Ancho del rectángulo
-            Constantes.HEIGHT_PERSONAJE    # Alto del rectángulo
-        )
+        # Creamos rectangulo. Sera la hitbox
+        self.shape = pygame.Rect(0, 0,Constantes.WIDTH_PERSONAJE,Constantes.HEIGHT_PERSONAJE)           # self → este objeto | shape → su forma/caja# Posición inicial temporal (x=0, y=0) # Ancho del rectángulo# Alto del rectángulo
 
         self.shape.center = (x, y)         # Recoloca el rectángulo para que su centro quede en (x,y)
 
         # Animaciones
         self.animaciones_idle = animaciones_idle
         self.animaciones_walk = animaciones_walk
+        self.animaciones_jump = animaciones_jump
         self.animaciones = animaciones_idle  # empieza en idle
         self.moviendose = False  # nueva bandera
-        self.animaciones_jump = animaciones_jump
+
 
         # Movimiento/Tiempo
         self.frame_index = 0
