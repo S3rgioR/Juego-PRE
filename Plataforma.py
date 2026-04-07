@@ -24,5 +24,5 @@ class Plataforma():
 
         return superficie
 
-    def draw(self, interfaz):
-        interfaz.blit(self.superficie, (self.shape.x, self.shape.y))
+    def draw(self, interfaz, camara):
+        interfaz.blit(self.superficie, camara.aplicar(self.shape))

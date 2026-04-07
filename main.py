@@ -1,5 +1,6 @@
 import pygame        # Importa la librería pygame
 import Constantes    # Importa nuestro archivo de constantes
+from Camara import Camara
 from Personaje import Personaje  # De Personaje.py importa la clase Personaje
 from Nivel import cargar_nivel_1
 
@@ -9,6 +10,8 @@ Ventana = pygame.display.set_mode(          # pygame → librería | display →
     (Constantes.WIDTH, Constantes.HEIGHT)   # Tamaño de la ventana como tupla (ancho, alto)
 )
 pygame.display.set_caption("Juego")         # display → módulo de pantalla | set_caption → pone el título en la barra superior
+
+camara = Camara()
 
 def escalar_img(image,scale):
     w= image.get_width()
@@ -74,13 +77,19 @@ def main():                    # Define la función principal del juego
     while jugando == True:     # Bucle principal: se repite cada fotograma mientras jugando sea True
         reloj.tick(Constantes.FPS)   # Limita la velocidad a 60 FPS (espera lo necesario entre fotogramas)
 
+        # Actualizar cámara (antes de dibujar)
+        camara.update(jugador)
 
-        # Iniciar fondo
+        # Fondo — el fondo estático NO se desplaza con la cámara
         Ventana.blit(fondo, (0, 0))
         Ventana.blit(fondo_walls, (0, 0))
 
+        # Plataformas — sí se desplazan
         for plat in plataformas:
-            plat.draw(Ventana)
+            plat.draw(Ventana, camara)
+
+        # Jugador — sí se desplaza
+        jugador.draw(Ventana, camara)
 
         delta_x = 0   # Desplazamiento horizontal de este fotograma, empieza en 0
         delta_y = 0   # Desplazamiento vertical de este fotograma, empieza en 0
@@ -93,7 +102,6 @@ def main():                    # Define la función principal del juego
 
 
         jugador.movimiento(delta_x, 0, plataformas,reloj)   # Aplica el desplazamiento calculado al personaje
-        jugador.draw(Ventana)                  # Dibuja el personaje en la ventana
 
         jugador.update()
 

@@ -3,8 +3,7 @@ from typing import final
 import pygame
 import pygame
 from Plataforma import Plataforma
-def crear_plataforma(x, y, ancho, alto):
-    pass
+
 def cargar_nivel_1(tileset):
     plataformas = []
 
@@ -23,23 +22,29 @@ def cargar_nivel_1(tileset):
     tile_final_der = pygame.Rect(48, 0, 16, 16)
 
     # Suelo
-    plataformas.append(Plataforma(0, 650, 1280, 16, tileset, tile_tierra))
-    plataformas.append(Plataforma(0, 666, 1280, 160, tileset, tile_suelo))
+    ysuelo = 656
+    plataformas.append(Plataforma(-1000, ysuelo, 20000, 16, tileset, tile_tierra))
+    plataformas.append(Plataforma(-1000, ysuelo+16, 20000, 160, tileset, tile_suelo))
+    def crear_plataforma(tileset, x, y, ancho):
+        alto=ysuelo-y
+        # --- Plataforma 1 --- #
 
-    # --- Plataforma 1 --- #
-    plataformas.append(Plataforma(150, 600, 200, 16, tileset, tile_tierra))
-    plataformas.append(Plataforma(150, 616, 200, 800, tileset, tile_suelo))
+        plataformas.append(Plataforma(x, y, ancho, 16, tileset, tile_tierra))
+        plataformas.append(Plataforma(x-16, y+16, ancho, alto+16, tileset, tile_suelo))
 
-    # Bordes plataforma
-    plataformas.append(Plataforma(134, 600, 16, 16, tileset, tile_final_der))
-    plataformas.append(Plataforma(350, 600, 16, 16, tileset, tile_final_iz))
+        # Bordes plataforma
+        plataformas.append(Plataforma(x-16, y, 16, 16, tileset, tile_final_der))
+        plataformas.append(Plataforma(x+ancho-16, y, 16, 16, tileset, tile_final_iz))
 
-    plataformas.append(Plataforma(134, 616, 16, 32, tileset, tile_pared_der))
-    plataformas.append(Plataforma(350, 616, 16, 32, tileset, tile_pared_iz))
+        plataformas.append(Plataforma(x-16, y+16, 16, ysuelo-y, tileset, tile_pared_der))
+        plataformas.append(Plataforma(x+ancho-16, y+16, 16, ysuelo-y, tileset, tile_pared_iz))
 
-    plataformas.append(Plataforma(134, 648, 16, 16, tileset, tile_union_der))
-    plataformas.append(Plataforma(350, 648, 16, 16, tileset, tile_union_iz))
-
+        plataformas.append(Plataforma(x-16, y+alto, 16, 16, tileset, tile_union_der))
+        plataformas.append(Plataforma(x+ancho-16, y+alto, 16, 16, tileset, tile_union_iz))
 
 
+    crear_plataforma(tileset,160,608,200)
+    crear_plataforma(tileset, 800, 560, 200)
+
+    crear_plataforma(tileset, 1500, 528, 300)
     return plataformas
