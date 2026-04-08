@@ -71,23 +71,21 @@ class Personaje():                          # Define la clase Personaje
         if self.atacando:
             self.hitbox_ataque = self._calcular_hitbox_ataque()
 
-    def draw(self, interfaz):              # Método para dibujar el personaje
+    def draw(self, interfaz, camara):
         imagen_flip = pygame.transform.flip(self.image, self.flip, False)
         img_rect = imagen_flip.get_rect(midbottom=self.shape.midbottom)
 
+        # Aplica el offset de cámara
+        img_rect = camara.aplicar(img_rect)
         interfaz.blit(imagen_flip, img_rect)
 
-        # Hitbox del cuerpo (magenta)
-        pygame.draw.rect(                  # pygame → librería | draw → módulo de dibujo | rect → dibuja rectángulo
-            interfaz,                      # Superficie donde dibujar (la ventana)
-            Constantes.COLOR_PERSONAJE,    # Color del rectángulo
-            self.shape,                     # El rectángulo a dibujar
-            1
-        )
-        # Hitbox de ataque (amarillo) — solo cuando ataca
-        if self.hitbox_ataque:
-            pygame.draw.rect(interfaz, (255, 255, 0), self.hitbox_ataque, 2)
+        # Hitboxes desplazadas también
+        shape_cam = camara.aplicar(self.shape)
+        pygame.draw.rect(interfaz, Constantes.COLOR_PERSONAJE, shape_cam, 1)
 
+        if self.hitbox_ataque:
+            hitbox_cam = camara.aplicar(self.hitbox_ataque)
+            pygame.draw.rect(interfaz, (255, 255, 0), hitbox_cam, 2)
     def saltar(self):
 
         if self.en_suelo or self.coyote_timer > 0:
@@ -152,13 +150,7 @@ class Personaje():                          # Define la clase Personaje
             if not self.atacando:  # No reinicia el frame si ya estamos en medio de un ataque
                 self.frame_index = 0
 
-        # Colisión con borde izquierdo
-        if self.shape.left < 0:
-            self.shape.left = 0
 
-        # Colisión con borde derecho
-        if self.shape.right > Constantes.WIDTH:
-            self.shape.right = Constantes.WIDTH
 
         # --- Gravedad ---
         self.velocidad_y += Constantes.GRAVEDAD  # Cada fotograma la caída es un poco más rápida
