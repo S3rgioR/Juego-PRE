@@ -63,12 +63,12 @@ for i in range(6):  # ajusta el número de frames
     img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/walk/ogre-walk{1+i}.png")
     img = escalar_img(img, Constantes.SCALA_PERSONAJE)
     anim_enemigo.append(img)
-enemigos = [
-    Enemigo_1(600, 400, anim_enemigo, distancia_patrulla=200),
-    Enemigo_1(900, 400, anim_enemigo, distancia_patrulla=100),
-]
-def main():                    # Define la función principal del juego
 
+def main():                    # Define la función principal del juego
+    enemigos = [
+        Enemigo_1(600, 400, anim_enemigo, distancia_patrulla=2000),
+        Enemigo_1(1500, 400, anim_enemigo, distancia_patrulla=10000),
+    ]
     mover_derecha = False      # Bandera: indica si la tecla D está pulsada
     mover_izquierda = False    # Bandera: indica si la tecla A está pulsada
 
@@ -114,6 +114,8 @@ def main():                    # Define la función principal del juego
             for enemigo in enemigos:
                 if jugador.hitbox_ataque.colliderect(enemigo.shape) and enemigo.vivo:
                     enemigo.recibir_daño(1)
+
+        enemigos = [enemigo for enemigo in enemigos if enemigo.vivo]
 
         # Cada if comprueba las banderas y asigna el desplazamiento correspondiente
         if mover_derecha == True:

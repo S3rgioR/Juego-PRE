@@ -38,9 +38,9 @@ class Enemigo_1():
 
     def _patrullar(self):
         if self.shape.x <= self.patrol_min:
-            self.flip = True
-        elif self.shape.right >= self.patrol_max:
             self.flip = False
+        elif self.shape.right >= self.patrol_max:
+            self.flip = True
 
         self.shape.x += -self.velocidad if self.flip else self.velocidad
 
@@ -54,8 +54,10 @@ class Enemigo_1():
             if self.shape.colliderect(plat.shape):
                 if self.flip:  # moviéndose a la izquierda
                     self.shape.left = plat.shape.right
+                    self.flip= False
                 else:  # moviéndose a la derecha
                     self.shape.right = plat.shape.left
+                    self.flip = True
 
         # --- COLISIONES VERTICALES ---
         self.en_suelo = False
@@ -72,8 +74,10 @@ class Enemigo_1():
                     self.velocidad_y = 0
 
     def recibir_daño(self, daño):
+
         if not self.vivo:
             return
+
         self.hp -= daño
         if self.hp <= 0:
             self.hp = 0
