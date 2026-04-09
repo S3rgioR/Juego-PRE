@@ -52,8 +52,14 @@ for i in range(6):  # ajusta el número de frames
     img = escalar_img(img, Constantes.SCALA_PERSONAJE)
     animaciones_attack_jump.append(img)
 
+frames = {'Parado': animaciones_idle,
+          'Andando': animaciones_walk,
+          'Saltando': animaciones_jump,
+          'AtaqueParado': animaciones_attack_idle,
+          'AtaqueSalto': animaciones_attack_jump}
+
 # Pasa ambas listas al personaje
-jugador = Personaje(250, 250, animaciones_idle, animaciones_walk,animaciones_jump, animaciones_attack_idle, animaciones_attack_jump)
+jugador = Personaje(250, 250, frames)
 
 def main():                    # Define la función principal del juego
 
