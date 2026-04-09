@@ -22,7 +22,7 @@ def cargar_nivel_1(tileset):
     tile_final_der = pygame.Rect(48, 0, 16, 16)
 
     # Suelo
-    ysuelo = 576
+    ysuelo = 656
     plataformas.append(Plataforma(-1000, ysuelo, 20000, 16, tileset, tile_tierra))
     plataformas.append(Plataforma(-1000, ysuelo+16, 20000, 160, tileset, tile_suelo))
     def crear_plataforma(tileset, x, y, ancho):
@@ -43,8 +43,8 @@ def cargar_nivel_1(tileset):
         plataformas.append(Plataforma(x+ancho-16, y+alto, 16, 16, tileset, tile_union_iz))
 
 
-    crear_plataforma(tileset,160,608-80,200)
-    crear_plataforma(tileset, 800, 560-80, 200)
+    crear_plataforma(tileset,160,608,200)
+    crear_plataforma(tileset, 800, 560, 200)
 
-    crear_plataforma(tileset, 1500, 528-80, 300)
+    crear_plataforma(tileset, 1500, 528, 300)
     return plataformas
