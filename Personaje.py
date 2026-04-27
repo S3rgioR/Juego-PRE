@@ -5,7 +5,7 @@ import Constantes   # Importa nuestro archivo de constantes
 import Plataforma
 
 class Personaje():                          # Define la clase Personaje
-    def __init__(self, x, y,animaciones_idle, animaciones_walk,animaciones_jump, animaciones_attack_idle,animaciones_attack_jump):              # Constructor: se ejecuta al crear el personaje
+    def __init__(self, x, y, frames):              # Constructor: se ejecuta al crear el personaje
         ### Atributos ###
 
         # Creamos rectangulo. Sera la hitbox
@@ -13,14 +13,9 @@ class Personaje():                          # Define la clase Personaje
 
         self.shape.center = (x, y)         # Recoloca el rectángulo para que su centro quede en (x,y)
 
-        # Animaciones
-        self.animaciones_idle = animaciones_idle
-        self.animaciones_walk = animaciones_walk
-        self.animaciones_jump = animaciones_jump
-        self.animaciones_attack_idle = animaciones_attack_idle
-        self.animaciones_attack_jump = animaciones_attack_jump
+        self.frames = frames
 
-        self.animaciones = animaciones_idle  # empieza en idle
+        self.animaciones = self.frames['Parado']  # empieza en idle
         self.moviendose = False
         self.atacando = False
         self.attack_frame_done = False
@@ -40,8 +35,8 @@ class Personaje():                          # Define la clase Personaje
         self.coyote_time = 300  # milisegundos de margen
         self.coyote_timer = 0  # cuenta atrás activa
 
-        self.hp=5
         self.vivo=True
+        self.hp=5
     def atacar(self):
         if not self.atacando:  # Evita interrumpir el ataque en curso
             self.atacando = True
@@ -142,13 +137,13 @@ class Personaje():                          # Define la clase Personaje
                 self.coyote_timer = 0
         # --- Selección de animación según estado combinado ---
         if self.atacando:
-            nueva_anim = self.animaciones_attack_jump if not self.en_suelo else self.animaciones_attack_idle
+            nueva_anim = self.frames['AtaqueSalto'] if not self.en_suelo else self.frames['AtaqueParado']
         elif not self.en_suelo:
-            nueva_anim = self.animaciones_jump
+            nueva_anim = self.frames['Saltando']
         elif self.moviendose:
-            nueva_anim = self.animaciones_walk
+            nueva_anim = self.frames['Andando']
         else:
-            nueva_anim = self.animaciones_idle
+            nueva_anim = self.frames['Parado']
 
         if nueva_anim != self.animaciones:  # solo resetea si cambia de estado
             self.animaciones = nueva_anim

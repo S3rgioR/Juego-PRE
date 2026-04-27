@@ -4,9 +4,6 @@ from Camara import Camara
 from Personaje import Personaje  # De Personaje.py importa la clase Personaje
 from Nivel import cargar_nivel_1
 from Enemigo_1 import Enemigo_1
-
-
-
 pygame.init()                    # Inicializa todos los módulos internos de pygame
 
 Ventana = pygame.display.set_mode(          # pygame → librería | display → módulo de pantalla | set_mode → crea la ventana
@@ -55,9 +52,14 @@ for i in range(6):  # ajusta el número de frames
     img = escalar_img(img, Constantes.SCALA_PERSONAJE)
     animaciones_attack_jump.append(img)
 
-# Pasa ambas listas al personaje
-jugador = Personaje(250, 250, animaciones_idle, animaciones_walk,animaciones_jump, animaciones_attack_idle, animaciones_attack_jump)
+frames = {'Parado': animaciones_idle,
+          'Andando': animaciones_walk,
+          'Saltando': animaciones_jump,
+          'AtaqueParado': animaciones_attack_idle,
+          'AtaqueSalto': animaciones_attack_jump}
 
+# Pasa ambas listas al personaje
+jugador = Personaje(250, 250, frames)
 anim_enemigo_attack=[]
 for i in range(6):  # ajusta el número de frames
     img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/Attack/ogre-attack{1+i}.png")
