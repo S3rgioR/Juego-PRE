@@ -1,7 +1,11 @@
 import pygame        # Importa la librería pygame
 import Constantes    # Importa nuestro archivo de constantes
+from Camara import Camara
 from Personaje import Personaje  # De Personaje.py importa la clase Personaje
 from Nivel import cargar_nivel_1
+from Enemigo_1 import Enemigo_1
+
+
 
 pygame.init()                    # Inicializa todos los módulos internos de pygame
 
@@ -9,6 +13,8 @@ Ventana = pygame.display.set_mode(          # pygame → librería | display →
     (Constantes.WIDTH, Constantes.HEIGHT)   # Tamaño de la ventana como tupla (ancho, alto)
 )
 pygame.display.set_caption("Juego")         # display → módulo de pantalla | set_caption → pone el título en la barra superior
+
+camara = Camara()
 
 def escalar_img(image,scale):
     w= image.get_width()
@@ -52,8 +58,21 @@ for i in range(6):  # ajusta el número de frames
 # Pasa ambas listas al personaje
 jugador = Personaje(250, 250, animaciones_idle, animaciones_walk,animaciones_jump, animaciones_attack_idle, animaciones_attack_jump)
 
+anim_enemigo_attack=[]
+for i in range(6):  # ajusta el número de frames
+    img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/Attack/ogre-attack{1+i}.png")
+    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
+    anim_enemigo_attack.append(img)
+anim_enemigo_walk=[]
+for i in range(6):  # ajusta el número de frames
+    img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/walk/ogre-walk{1+i}.png")
+    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
+    anim_enemigo_walk.append(img)
 def main():                    # Define la función principal del juego
-
+    enemigos = [
+        Enemigo_1(600, 400, anim_enemigo_walk,anim_enemigo_attack, distancia_patrulla=2000),
+        Enemigo_1(1500, 400, anim_enemigo_walk,anim_enemigo_attack, distancia_patrulla=10000),
+    ]
     mover_derecha = False      # Bandera: indica si la tecla D está pulsada
     mover_izquierda = False    # Bandera: indica si la tecla A está pulsada
 
@@ -74,16 +93,33 @@ def main():                    # Define la función principal del juego
     while jugando == True:     # Bucle principal: se repite cada fotograma mientras jugando sea True
         reloj.tick(Constantes.FPS)   # Limita la velocidad a 60 FPS (espera lo necesario entre fotogramas)
 
+        # Actualizar cámara (antes de dibujar)
+        camara.update(jugador)
 
-        # Iniciar fondo
+        # Fondo — el fondo estático NO se desplaza con la cámara
         Ventana.blit(fondo, (0, 0))
         Ventana.blit(fondo_walls, (0, 0))
 
+        # Plataformas — sí se desplazan
         for plat in plataformas:
-            plat.draw(Ventana)
+            plat.draw(Ventana, camara)
+        # Enemigo
+        for enemigo in enemigos:
+            enemigo.update(plataformas, jugador)
+            enemigo.draw(Ventana, camara)
+        # Jugador — sí se desplaza
+        jugador.draw(Ventana, camara)
 
         delta_x = 0   # Desplazamiento horizontal de este fotograma, empieza en 0
         delta_y = 0   # Desplazamiento vertical de este fotograma, empieza en 0
+
+        # Ataque
+        if jugador.hitbox_ataque:
+            for enemigo in enemigos:
+                if jugador.hitbox_ataque.colliderect(enemigo.shape) and enemigo.vivo:
+                    enemigo.recibir_daño(1)
+
+        enemigos = [enemigo for enemigo in enemigos if enemigo.vivo]
 
         # Cada if comprueba las banderas y asigna el desplazamiento correspondiente
         if mover_derecha == True:
@@ -93,9 +129,12 @@ def main():                    # Define la función principal del juego
 
 
         jugador.movimiento(delta_x, 0, plataformas,reloj)   # Aplica el desplazamiento calculado al personaje
-        jugador.draw(Ventana)                  # Dibuja el personaje en la ventana
 
         jugador.update()
+
+        for enemigo in enemigos:
+            if enemigo.hitbox_ataque and enemigo.hitbox_ataque.colliderect(jugador.shape):
+                jugador.recibir_daño(1)
 
         for event in pygame.event.get():       # Obtiene todos los eventos ocurridos y los recorre uno a uno
             if event.type == pygame.QUIT:      # Si el evento es cerrar la ventana (X)
