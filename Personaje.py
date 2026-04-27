@@ -1,3 +1,5 @@
+from math import trunc
+
 import pygame       # Importa la librería pygame
 import Constantes   # Importa nuestro archivo de constantes
 import Plataforma
@@ -37,6 +39,9 @@ class Personaje():                          # Define la clase Personaje
         # Coyote time
         self.coyote_time = 300  # milisegundos de margen
         self.coyote_timer = 0  # cuenta atrás activa
+
+        self.hp=5
+        self.vivo=True
     def atacar(self):
         if not self.atacando:  # Evita interrumpir el ataque en curso
             self.atacando = True
@@ -170,3 +175,13 @@ class Personaje():                          # Define la clase Personaje
         if self.shape.top < 0:
             self.shape.top = 0
             self.velocidad_y = 0
+    def recibir_daño(self, daño):
+
+        if not self.vivo:
+            return
+
+        self.hp -= daño
+        if self.hp <= 0:
+            self.hp = 0
+            self.vivo = False
+            self.frame_index = 0

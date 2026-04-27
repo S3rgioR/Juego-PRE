@@ -58,16 +58,20 @@ for i in range(6):  # ajusta el número de frames
 # Pasa ambas listas al personaje
 jugador = Personaje(250, 250, animaciones_idle, animaciones_walk,animaciones_jump, animaciones_attack_idle, animaciones_attack_jump)
 
-anim_enemigo=[]
+anim_enemigo_attack=[]
+for i in range(6):  # ajusta el número de frames
+    img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/Attack/ogre-attack{1+i}.png")
+    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
+    anim_enemigo_attack.append(img)
+anim_enemigo_walk=[]
 for i in range(6):  # ajusta el número de frames
     img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/walk/ogre-walk{1+i}.png")
     img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    anim_enemigo.append(img)
-
+    anim_enemigo_walk.append(img)
 def main():                    # Define la función principal del juego
     enemigos = [
-        Enemigo_1(600, 400, anim_enemigo, distancia_patrulla=2000),
-        Enemigo_1(1500, 400, anim_enemigo, distancia_patrulla=10000),
+        Enemigo_1(600, 400, anim_enemigo_walk,anim_enemigo_attack, distancia_patrulla=2000),
+        Enemigo_1(1500, 400, anim_enemigo_walk,anim_enemigo_attack, distancia_patrulla=10000),
     ]
     mover_derecha = False      # Bandera: indica si la tecla D está pulsada
     mover_izquierda = False    # Bandera: indica si la tecla A está pulsada
@@ -101,7 +105,7 @@ def main():                    # Define la función principal del juego
             plat.draw(Ventana, camara)
         # Enemigo
         for enemigo in enemigos:
-            enemigo.update(plataformas)
+            enemigo.update(plataformas, jugador)
             enemigo.draw(Ventana, camara)
         # Jugador — sí se desplaza
         jugador.draw(Ventana, camara)
@@ -127,6 +131,10 @@ def main():                    # Define la función principal del juego
         jugador.movimiento(delta_x, 0, plataformas,reloj)   # Aplica el desplazamiento calculado al personaje
 
         jugador.update()
+
+        for enemigo in enemigos:
+            if enemigo.hitbox_ataque and enemigo.hitbox_ataque.colliderect(jugador.shape):
+                jugador.recibir_daño(1)
 
         for event in pygame.event.get():       # Obtiene todos los eventos ocurridos y los recorre uno a uno
             if event.type == pygame.QUIT:      # Si el evento es cerrar la ventana (X)
