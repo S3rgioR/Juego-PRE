@@ -10,7 +10,7 @@ class Camara():
         self.offset_x = Constantes.WIDTH * 0.35
         self.offset_y = Constantes.HEIGHT * 0.75
 
-        # Suavizado: cuanto menor, más suave
+        # Suavizado: cuanto menor, más suave (0.1 = lento, 1.0 = instantáneo)
         self.suavizado = 0.15
 
     def update(self, jugador):
