@@ -1,168 +1,141 @@
-import pygame        # Importa la librería pygame
-import Constantes    # Importa nuestro archivo de constantes
-from Camara import Camara
-from Personaje import Personaje  # De Personaje.py importa la clase Personaje
+"""Punto de entrada del juego - Composición explícita del patrón MVP.
+
+Este módulo es responsable de:
+1. Cargar todos los assets (imágenes, animaciones)
+2. Crear las tres capas del patrón MVP: Model, View, Presenter
+3. Conectar las capas entre sí
+4. Iniciar el game loop
+
+Arquitectura MVP:
+- Model  : estado del juego, física, IA, combate. Sin pygame gráfico.
+- View   : pygame, sprites, cámara, input, render. En la carpeta view/.
+- Presenter: intermediario. Se suscribe a eventos de la Vista y coordina el loop.
+
+Orden de inicialización importante:
+1. pygame.init()
+2. Calcular constantes de tamaño del personaje (requiere image.load, NO convert)
+3. Cargar frames de animación (image.load + scale, NO convert_alpha aún)
+4. Crear Model (no necesita pygame.display)
+5. Crear View → aquí se llama pygame.display.set_mode() y DESPUÉS se puede
+   usar convert_alpha(). El tileset y los fondos se cargan dentro de View.__init__.
+6. Crear Presenter y arrancar el loop.
+"""
+
+import pygame
+import Constantes
+from model import JuegoModel
+from view import PygameView
+from presenter import JuegoPresenter
 from Nivel import cargar_nivel_1
-from Enemigo_1 import Enemigo_1
-pygame.init()                    # Inicializa todos los módulos internos de pygame
 
-Ventana = pygame.display.set_mode(          # pygame → librería | display → módulo de pantalla | set_mode → crea la ventana
-    (Constantes.WIDTH, Constantes.HEIGHT)   # Tamaño de la ventana como tupla (ancho, alto)
-)
-pygame.display.set_caption("Juego")         # display → módulo de pantalla | set_caption → pone el título en la barra superior
 
-camara = Camara()
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-def escalar_img(image,scale):
-    w= image.get_width()
-    h= image.get_height()
-    layer_image = pygame.transform.scale(image, (w * scale,
-                                                        h * scale))
-    return layer_image
+def escalar_img(image, scale):
+    w = image.get_width()
+    h = image.get_height()
+    return pygame.transform.scale(image, (int(w * scale), int(h * scale)))
 
-# Animaciones idle (ya las tienes)
-animaciones_idle = []
-for i in range(4):
-    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/Idle/frame{i+1}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    animaciones_idle.append(img)
 
-# Animaciones de caminar (ajusta la ruta y el número de frames a tus sprites)
-animaciones_walk = []
-for i in range(12):  # cambia 6 por el número de frames que tengas
-    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/Run/frame{i+1}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    animaciones_walk.append(img)
+def cargar_frames(patron, n, scale):
+    """Carga n imágenes usando un patrón con {} como marcador de índice (base 1)."""
+    frames = []
+    for i in range(1, n + 1):
+        img = pygame.image.load(patron.format(i))
+        img = escalar_img(img, scale)
+        frames.append(img)
+    return frames
 
-animaciones_jump = []
-for i in range(4):  # ajusta el número de frames
-    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/Jump/Jump{i+1}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    animaciones_jump.append(img)
 
-animaciones_attack_idle = []
-for i in range(4):  # ajusta el número de frames
-    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/SwordSlash/frame{i+1}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    animaciones_attack_idle.append(img)
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
-animaciones_attack_jump = []
-for i in range(6):  # ajusta el número de frames
-    img = pygame.image.load(f"Assets/Characters/Terrible Knight/Sprites/AirSwordSlash/AirSwordSlash-export{i+1}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    animaciones_attack_jump.append(img)
+def main():
+    """Carga assets, compone las capas MVP e inicia el game loop."""
 
-frames = {'Parado': animaciones_idle,
-          'Andando': animaciones_walk,
-          'Saltando': animaciones_jump,
-          'AtaqueParado': animaciones_attack_idle,
-          'AtaqueSalto': animaciones_attack_jump}
+    pygame.init()
 
-# Pasa ambas listas al personaje
-jugador = Personaje(250, 250, frames)
-anim_enemigo_attack=[]
-for i in range(6):  # ajusta el número de frames
-    img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/Attack/ogre-attack{1+i}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    anim_enemigo_attack.append(img)
-anim_enemigo_walk=[]
-for i in range(6):  # ajusta el número de frames
-    img = pygame.image.load(f"Assets/Characters/Ogre/Sprites/walk/ogre-walk{1+i}.png")
-    img = escalar_img(img, Constantes.SCALA_PERSONAJE)
-    anim_enemigo_walk.append(img)
-def main():                    # Define la función principal del juego
-    enemigos = [
-        Enemigo_1(600, 400, anim_enemigo_walk,anim_enemigo_attack, distancia_patrulla=2000),
-        Enemigo_1(1500, 400, anim_enemigo_walk,anim_enemigo_attack, distancia_patrulla=10000),
+    s = Constantes.SCALA_PERSONAJE
+
+    # Calcular dimensiones del personaje a partir de la primera imagen.
+    # Usamos image.load sin convert_alpha() porque aún no hay ventana.
+    # Sobreescribimos las constantes ANTES de construir Model o View,
+    # ya que ambos las necesitan para sus rects y hitboxes.
+    _img_ref = pygame.image.load(
+        "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png"
+    )
+    Constantes.WIDTH_PERSONAJE  = int(_img_ref.get_width()  * 0.1  * s)
+    Constantes.HEIGHT_PERSONAJE = int(_img_ref.get_height() * 0.35 * s)
+
+    # --- Animaciones del jugador ---
+    # image.load + scale son seguros antes de crear la ventana.
+    frames_jugador = {
+        'Parado': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/Idle/frame{}.png", 4, s),
+        'Andando': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/Run/frame{}.png", 12, s),
+        'Saltando': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/Jump/Jump{}.png", 4, s),
+        'AtaqueParado': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/SwordSlash/frame{}.png", 4, s),
+        'AtaqueSalto': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/AirSwordSlash/AirSwordSlash-export{}.png", 6, s),
+    }
+
+    # --- Animaciones de enemigos ---
+    anim_ogre_walk   = cargar_frames(
+        "Assets/Characters/Ogre/Sprites/walk/ogre-walk{}.png", 6, s)
+    anim_ogre_attack = cargar_frames(
+        "Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
+
+    # --- Datos de enemigos ---
+    # El Model usa 'x', 'y', 'distancia_patrulla', 'num_frames_ataque'.
+    # La Vista usa 'x', 'y', 'anim_walk', 'anim_attack'.
+    datos_enemigos = [
+        {
+            'x': 600, 'y': 400,
+            'distancia_patrulla': 2000,
+            'num_frames_ataque':  6,
+            'anim_walk':   anim_ogre_walk,
+            'anim_attack': anim_ogre_attack,
+        },
+        {
+            'x': 1500, 'y': 400,
+            'distancia_patrulla': 10000,
+            'num_frames_ataque':  6,
+            'anim_walk':   anim_ogre_walk,
+            'anim_attack': anim_ogre_attack,
+        },
     ]
-    mover_derecha = False      # Bandera: indica si la tecla D está pulsada
-    mover_izquierda = False    # Bandera: indica si la tecla A está pulsada
 
-    reloj = pygame.time.Clock()  # pygame → librería | time → módulo de tiempo | Clock() → crea un reloj para controlar los FPS
+    # ---------------------------------------------------------------------------
+    # Composición MVP
+    # ---------------------------------------------------------------------------
 
-    # Seleccionar fondo
-    fondo = pygame.image.load("Assets/Enviorments/caverns-files-web/layers/background.png")
-    fondo = pygame.transform.scale(fondo, (Constantes.WIDTH, Constantes.HEIGHT))
+    # 1. Model: estado y lógica. Solo necesita datos escalares de cada enemigo.
+    modelo = JuegoModel(datos_enemigos)
 
-    fondo_walls = pygame.image.load("Assets/Enviorments/caverns-files-web/layers/back-walls.png")
-    fondo_walls = pygame.transform.scale(fondo_walls, (Constantes.WIDTH, Constantes.HEIGHT))
+    # 2. View: pygame, sprites, cámara.
+    #    pygame.display.set_mode() se llama DENTRO de PygameView.__init__.
+    #    Por eso el tileset (que usa convert_alpha) también se carga dentro,
+    #    así como los fondos. NO se pasa tileset desde aquí.
+    vista = PygameView(
+        frames_jugador=frames_jugador,
+        datos_enemigos=datos_enemigos,
+        nivel_loader=cargar_nivel_1
 
-    # Tilesets
-    tileset = pygame.image.load("Assets/Enviorments/caverns-files-web/layers/tiles_mini.png").convert_alpha()
-    plataformas = cargar_nivel_1(tileset)
+    )
 
-    jugando = True             # Condición que mantiene el juego activo
-    while jugando == True:     # Bucle principal: se repite cada fotograma mientras jugando sea True
-        reloj.tick(Constantes.FPS)   # Limita la velocidad a 60 FPS (espera lo necesario entre fotogramas)
+    # 3. Presenter: conecta Model y View, gestiona el game loop.
+    num_frames_ataque = len(frames_jugador['AtaqueParado'])
+    presenter = JuegoPresenter(vista, modelo, num_frames_ataque_jugador=num_frames_ataque)
 
-        # Actualizar cámara (antes de dibujar)
-        camara.update(jugador)
-
-        # Fondo — el fondo estático NO se desplaza con la cámara
-        Ventana.blit(fondo, (0, 0))
-        Ventana.blit(fondo_walls, (0, 0))
-
-        # Plataformas — sí se desplazan
-        for plat in plataformas:
-            plat.draw(Ventana, camara)
-        # Enemigo
-        for enemigo in enemigos:
-            enemigo.update(plataformas, jugador)
-            enemigo.draw(Ventana, camara)
-        # Jugador — sí se desplaza
-        jugador.draw(Ventana, camara)
-
-        delta_x = 0   # Desplazamiento horizontal de este fotograma, empieza en 0
-        delta_y = 0   # Desplazamiento vertical de este fotograma, empieza en 0
-
-        # Ataque
-        if jugador.hitbox_ataque:
-            for enemigo in enemigos:
-                if jugador.hitbox_ataque.colliderect(enemigo.shape) and enemigo.vivo:
-                    enemigo.recibir_daño(1)
-
-        enemigos = [enemigo for enemigo in enemigos if enemigo.vivo]
-
-        # Cada if comprueba las banderas y asigna el desplazamiento correspondiente
-        if mover_derecha == True:
-            delta_x = Constantes.VELOCIDAD     # Mover derecha → X positiva
-        if mover_izquierda == True:
-            delta_x = -Constantes.VELOCIDAD    # Mover izquierda → X negativa
+    # 4. Iniciar el game loop
+    presenter.ejecutar()
 
 
-        jugador.movimiento(delta_x, 0, plataformas,reloj)   # Aplica el desplazamiento calculado al personaje
-
-        jugador.update()
-
-        for enemigo in enemigos:
-            if enemigo.hitbox_ataque and enemigo.hitbox_ataque.colliderect(jugador.shape):
-                jugador.recibir_daño(1)
-
-        for event in pygame.event.get():       # Obtiene todos los eventos ocurridos y los recorre uno a uno
-            if event.type == pygame.QUIT:      # Si el evento es cerrar la ventana (X)
-                jugando = False                # Sale del bucle en el próximo ciclo
-
-            if event.type == pygame.KEYDOWN:   # Si el evento es pulsar una tecla
-                if event.key == pygame.K_a:    # Si esa tecla es la A
-                    mover_izquierda = True     # Activa la bandera de moverse a la izquierda
-                if event.key == pygame.K_d:
-                    mover_derecha = True
-                if event.key == pygame.K_SPACE:    # Espacio → saltar
-                    jugador.saltar()
-                if event.key == pygame.K_j:
-                    jugador.atacar()
-
-            if event.type == pygame.KEYUP:     # Si el evento es soltar una tecla
-                if event.key == pygame.K_a:    # Si esa tecla es la A
-                    mover_izquierda = False    # Desactiva la bandera
-                if event.key == pygame.K_d:
-                    mover_derecha = False
-
-
-        pygame.display.update()   # display → pantalla | update → actualiza la ventana mostrando todo lo dibujado este fotograma
-
-    pygame.quit()   # Cierra pygame y libera todos sus recursos
-
-
-if __name__ == "__main__":   # Solo se ejecuta si lanzas main.py directamente (no si lo importas desde otro archivo)
-    main()                   # Llama a la función principal
+if __name__ == "__main__":
+    main()

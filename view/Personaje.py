@@ -61,6 +61,7 @@ class PersonajeSprite:
         self.image = self.animaciones[self.frame_index]
         self.flip = False
         self.hitbox_ataque = None
+        self.en_suelo = False
 
     def sincronizar(self, estado_modelo):
         """Actualiza el sprite con los datos actuales del Model.

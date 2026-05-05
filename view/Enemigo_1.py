@@ -63,6 +63,7 @@ class Enemigo1Sprite:
         self.image = self.anim_actual[0]
         self.flip = True
         self.hitbox_ataque = None
+        self._iframe_activo = False
 
     def sincronizar(self, estado_modelo):
         """Actualiza el sprite con los datos actuales del Model.
@@ -83,6 +84,7 @@ class Enemigo1Sprite:
         )
         self.flip = estado_modelo['flip']
         self.hitbox_ataque = estado_modelo['hitbox_ataque']
+        self._iframe_activo = estado_modelo.get('iframe_activo', False)
 
         # --- 2. Seleccionar animación ---
         nueva_anim = self.anim_attack if estado_modelo['atacando'] else self.anim_walk
@@ -113,7 +115,16 @@ class Enemigo1Sprite:
         """
         imagen_flip = pygame.transform.flip(self.image, not self.flip, False)
         img_rect = imagen_flip.get_rect(midbottom=self.shape.midbottom)
-        interfaz.blit(imagen_flip, camara.aplicar(img_rect))
+
+        # Efecto rojo durante los iframes: teñir la imagen con rojo semitransparente
+        if self._iframe_activo:
+            imagen_roja = imagen_flip.copy()
+            overlay = pygame.Surface(imagen_roja.get_size(), pygame.SRCALPHA)
+            overlay.fill((255, 0, 0, 120))   # rojo semitransparente
+            imagen_roja.blit(overlay, (0, 0))
+            interfaz.blit(imagen_roja, camara.aplicar(img_rect))
+        else:
+            interfaz.blit(imagen_flip, camara.aplicar(img_rect))
 
         # Debug: hitbox del enemigo
         pygame.draw.rect(interfaz, (255, 0, 0), camara.aplicar(self.shape), 1)

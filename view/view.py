@@ -192,7 +192,10 @@ class PygameView:
         # 5. Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
 
-        # 6. Flip de buffers
+        # 6. Dibuja vidas
+        self.dibujar_hud(estado_jugador)
+
+        # 7. Flip de buffers
         pygame.display.flip()
 
     # ------------------------------------------------------------------
@@ -219,3 +222,18 @@ class PygameView:
         """
         if 0 <= indice < len(self.sprites_enemigos):
             self.sprites_enemigos.pop(indice)
+
+    def dibujar_hud(self, estado_jugador):
+        fuente = pygame.font.SysFont(None, 36)
+
+        # Contador de hp en esquina superior izquierda
+        texto_hp = fuente.render(f"Vidas: {estado_jugador['hp']}", True, (255, 255, 255))
+        self.screen.blit(texto_hp, (20, 20))
+
+        # Game over si vivo es False
+        if not estado_jugador['vivo']:
+            fuente_grande = pygame.font.SysFont(None, 120)
+            texto_go = fuente_grande.render("GAME OVER", True, (220, 50, 50))
+            x = (Constantes.WIDTH - texto_go.get_width()) // 2
+            y = (Constantes.HEIGHT - texto_go.get_height()) // 2
+            self.screen.blit(texto_go, (x, y))
