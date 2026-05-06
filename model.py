@@ -227,25 +227,27 @@ class JugadorModel:
             x = self.shape.right
         return pygame.Rect(x, self.shape.top, ancho_hit, self.shape.height)
 
-    def obtener_estado(self):
-        """Devuelve un dict con el estado lógico para que la Vista sincronice su sprite.
 
-        Returns
-        -------
-        dict
-            Claves: 'pos', 'flip', 'atacando', 'en_suelo', 'moviendose',
-                    'hitbox_ataque', 'vivo', 'hp'.
-        """
-        return {
-            'pos':          self.shape.center,
-            'flip':         self.flip,
-            'atacando':     self.atacando,
-            'en_suelo':     self.en_suelo,
-            'moviendose':   self.moviendose,
-            'hitbox_ataque': self.hitbox_ataque,
-            'vivo':         self.vivo,
-            'hp':           self.hp,
-        }
+    def obtener_estado(self):
+            """Devuelve un dict con el estado lógico para que la Vista sincronice su sprite.
+
+            Returns
+            -------
+            dict
+                Claves: 'pos', 'flip', 'atacando', 'en_suelo', 'moviendose',
+                        'hitbox_ataque', 'vivo', 'hp'.
+            """
+            return {
+                'pos': self.shape.center,
+                'flip': self.flip,
+                'atacando': self.atacando,
+                'en_suelo': self.en_suelo,
+                'moviendose': self.moviendose,
+                'hitbox_ataque': self.hitbox_ataque,
+                'vivo': self.vivo,
+                'hp': self.hp,
+                'iframe_activo': self.iframe_timer > 0,
+            }
 
 
 # ---------------------------------------------------------------------------
