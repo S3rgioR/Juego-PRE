@@ -309,7 +309,7 @@ class Enemigo1Model:
         self.patrol_min   = x - distancia_patrulla
         self.patrol_max   = x + distancia_patrulla
 
-        self.hp   = 2
+        self.hp   = 5
         self.vivo = True
 
         self.rango_vision    = 100
@@ -325,7 +325,7 @@ class Enemigo1Model:
         self.ataque_frame_inicio = 2  # frame en que aparece la hitbox
         self.ataque_frame_fin = 5  # frame en que desaparece
 
-        self.iframe_duracion = 1000  # ms de invencibilidad tras recibir golpe
+        self.iframe_duracion = 600  # ms de invencibilidad tras recibir golpe
         self.iframe_timer = 0  # ms restantes de invencibilidad
 
     def recibir_daño(self, daño):

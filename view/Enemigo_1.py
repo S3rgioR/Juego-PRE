@@ -7,7 +7,7 @@ Recibe el estado lógico del Model cada frame a través de `sincronizar()`.
 
 import pygame
 import Constantes
-
+import numpy
 
 class Enemigo1Sprite:
     """Sprite visual del primer tipo de enemigo.
@@ -118,10 +118,14 @@ class Enemigo1Sprite:
 
         # Efecto rojo durante los iframes: teñir la imagen con rojo semitransparente
         if self._iframe_activo:
-            imagen_roja = imagen_flip.copy()
-            overlay = pygame.Surface(imagen_roja.get_size(), pygame.SRCALPHA)
-            overlay.fill((255, 0, 0, 120))   # rojo semitransparente
-            imagen_roja.blit(overlay, (0, 0))
+            imagen_roja = imagen_flip.convert_alpha()  # ← fuerza 32 bits
+            arr = pygame.surfarray.pixels3d(imagen_roja)
+            alpha = pygame.surfarray.pixels_alpha(imagen_roja)
+            mask = alpha > 0
+            arr[:, :, 0][mask] = numpy.minimum(255, arr[:, :, 0][mask].astype(int) + 150)
+            arr[:, :, 1][mask] = arr[:, :, 1][mask] // 2
+            arr[:, :, 2][mask] = arr[:, :, 2][mask] // 2
+            del arr, alpha
             interfaz.blit(imagen_roja, camara.aplicar(img_rect))
         else:
             interfaz.blit(imagen_flip, camara.aplicar(img_rect))
