@@ -91,10 +91,9 @@ def main():
     anim_ogre_attack = cargar_frames(
         "Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
 
-    # Animación del enemigo volador (reutiliza los frames de vuelo del ogre
-    # o sustitúyelos por los de tu asset volador).
+    # Animación del enemigo volador
     anim_volador_walk = cargar_frames(
-        "Assets/Characters/Ogre/Sprites/walk/ogre-walk{}.png", 6, s * 0.75)
+        "Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
 
     # --- Datos de enemigos ---
     # El Model usa 'x', 'y', 'distancia_patrulla', 'num_frames_ataque', 'tipo'.

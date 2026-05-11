@@ -119,6 +119,22 @@ class PygameView:
                     Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack'])
                 )
 
+        # --- Frames del proyectil del Enemigo_2 ---
+        from .Enemigo_2 import ProyectilSprite
+        escala_proj = Constantes.SCALA_PERSONAJE * 0.6
+        frames_proyectil = []
+        for i in range(1, 3):
+            img = pygame.image.load(
+                f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
+            ).convert_alpha()
+            w = int(img.get_width()  * escala_proj)
+            h = int(img.get_height() * escala_proj)
+            frames_proyectil.append(pygame.transform.scale(img, (w, h)))
+
+        for sprite in self.sprites_enemigos:
+            if isinstance(sprite, Enemigo2Sprite):
+                sprite.proyectil_frames = frames_proyectil
+
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
         self.evt_mover_derecha_inicio   = Event()
@@ -194,7 +210,7 @@ class PygameView:
         # 4. Enemigos
         for sprite, estado in zip(self.sprites_enemigos, estados_enemigos):
             sprite.sincronizar(estado)
-            sprite.draw(self.screen, self.camara)
+            sprite.draw(self.screen, self.camara, estado)
 
         # 5. Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
