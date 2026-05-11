@@ -103,7 +103,7 @@ class Enemigo1Sprite:
 
         self.image = self.anim_actual[self.frame_index]
 
-    def draw(self, interfaz, camara):
+    def draw(self, interfaz, camara, estado_modelo=None):
         """Dibuja el sprite del enemigo con sus hitboxes de depuración.
 
         Parameters

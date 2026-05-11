@@ -74,6 +74,9 @@ class Enemigo2Sprite:
         self._flotacion_offset = 0.0
         self._flotacion_tiempo = 0.0
 
+        self.proyectil_frames = []  # se asigna desde la Vista tras cargar assets
+        self._sprites_proyectiles = {}  # clave: id(estado), valor: ProyectilSprite
+
     def sincronizar(self, estado_modelo):
         """Actualiza el sprite con los datos actuales del Model.
 
@@ -108,26 +111,14 @@ class Enemigo2Sprite:
 
         self.image = self.anim_actual[self.frame_index]
 
-    def draw(self, interfaz, camara):
-        """Dibuja el sprite del enemigo volador con efecto de flotación y depuración.
-
-        Parameters
-        ----------
-        interfaz : pygame.Surface
-            Superficie principal de la ventana.
-        camara : Camara
-            Instancia de cámara para transformar coordenadas.
-        """
-        imagen_flip = pygame.transform.flip(self.image, not self.flip, False)
-
-        # El rect visual se desplaza por la flotación (estético, sin tocar shape)
+    def draw(self, interfaz, camara, estado_modelo=None):
+        imagen_flip = pygame.transform.flip(self.image, self.flip, False)
         img_rect = imagen_flip.get_rect(midbottom=self.shape.midbottom)
         img_rect.y += int(self._flotacion_offset)
 
-        # Efecto rojo durante los iframes
         if self._iframe_activo:
             imagen_roja = imagen_flip.convert_alpha()
-            arr   = pygame.surfarray.pixels3d(imagen_roja)
+            arr = pygame.surfarray.pixels3d(imagen_roja)
             alpha = pygame.surfarray.pixels_alpha(imagen_roja)
             mask = alpha > 0
             arr[:, :, 0][mask] = numpy.minimum(255, arr[:, :, 0][mask].astype(int) + 150)
@@ -138,5 +129,32 @@ class Enemigo2Sprite:
         else:
             interfaz.blit(imagen_flip, camara.aplicar(img_rect))
 
-        # Debug: hitbox del enemigo
         pygame.draw.rect(interfaz, (0, 180, 255), camara.aplicar(self.shape), 1)
+
+        proyectiles = [ep for ep in estado_modelo.get('proyectiles', []) if ep['vivo']]
+        while len(self._sprites_proyectiles) < len(proyectiles):
+            self._sprites_proyectiles[len(self._sprites_proyectiles)] = ProyectilSprite(self.proyectil_frames)
+        while len(self._sprites_proyectiles) > len(proyectiles):
+            self._sprites_proyectiles.pop(len(self._sprites_proyectiles) - 1)
+        for i, ep in enumerate(proyectiles):
+            self._sprites_proyectiles[i].draw(interfaz, camara, ep)
+
+class ProyectilSprite:
+    """Sprite visual del proyectil con animación persistente."""
+
+    def __init__(self, frames):
+        self.frames      = frames
+        self.frame_index = 0
+        self.update_time = pygame.time.get_ticks()
+        self.shape       = pygame.Rect(0, 0, frames[0].get_width(), frames[0].get_height())
+
+    def draw(self, interfaz, camara, estado):
+        self.shape.center = (int(estado['pos'][0]), int(estado['pos'][1]))
+
+        if pygame.time.get_ticks() - self.update_time > 80:
+            self.frame_index = (self.frame_index + 1) % len(self.frames)
+            self.update_time = pygame.time.get_ticks()
+
+        imagen = pygame.transform.flip(self.frames[self.frame_index], estado['flip'], False)
+        interfaz.blit(imagen, camara.aplicar(self.shape))
+        pygame.draw.rect(interfaz, (255, 165, 0), camara.aplicar(self.shape), 1)

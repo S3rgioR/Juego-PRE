@@ -506,6 +506,11 @@ class Enemigo2Model:
         self.iframe_duracion = 600
         self.iframe_timer    = 0
 
+        self.rango_vision = 450
+        self.cooldown_disparo = 1000  # ms entre disparos
+        self.ultimo_disparo = -2000
+        self.proyectiles = []  # lista de ProyectilModel
+
     def recibir_daño(self, daño):
         """Reduce hp. Ignora el golpe si hay iframes activos."""
         if not self.vivo or self.iframe_timer > 0:
@@ -517,17 +522,30 @@ class Enemigo2Model:
             self.vivo = False
 
     def actualizar(self, plataformas, jugador_model, delta_time_ms=16):
-        """Actualiza patrulla e iframes. No aplica gravedad ni colisiones verticales."""
         if not self.vivo:
             return
 
-        # Descontar iframe timer
         if self.iframe_timer > 0:
             self.iframe_timer -= delta_time_ms
             if self.iframe_timer < 0:
                 self.iframe_timer = 0
 
         self._patrullar()
+
+        for p in self.proyectiles:
+            p.actualizar(plataformas)
+        self.proyectiles = [p for p in self.proyectiles if p.vivo]
+
+        ahora = pygame.time.get_ticks()
+        if (self._jugador_en_vision(jugador_model)
+                and ahora - self.ultimo_disparo >= self.cooldown_disparo):
+            self.proyectiles.append(
+                ProyectilModel(
+                    self.shape.centerx, self.shape.centery,
+                    jugador_model.shape.centerx, jugador_model.shape.centery
+                )
+            )
+            self.ultimo_disparo = ahora
 
     def _patrullar(self):
         """Mueve el enemigo horizontalmente entre patrol_min y patrol_max."""
@@ -548,6 +566,23 @@ class Enemigo2Model:
             'iframe_activo': self.iframe_timer > 0,
         }
 
+
+    def _jugador_en_vision(self, jugador_model):
+        dx = jugador_model.shape.centerx - self.shape.centerx
+        dy = jugador_model.shape.centery - self.shape.centery
+        import math
+        return math.hypot(dx, dy) <= self.rango_vision
+
+    def obtener_estado(self):
+        return {
+            'pos': self.shape.center,
+            'flip': self.flip,
+            'atacando': False,
+            'hitbox_ataque': None,
+            'vivo': self.vivo,
+            'iframe_activo': self.iframe_timer > 0,
+            'proyectiles': [p.obtener_estado() for p in self.proyectiles],
+        }
 
 # ---------------------------------------------------------------------------
 # Model principal del juego
@@ -655,22 +690,33 @@ class JuegoModel:
         # Actualizar enemigos
         muertos = []
         for i, enemigo in enumerate(self.enemigos):
-            enemigo.actualizar(plataformas, self.jugador)
+            enemigo.actualizar(plataformas, self.jugador, delta_time_ms)
 
-            # Combate: golpe del jugador al enemigo
+            # Golpe del jugador al enemigo
             if (self.jugador.hitbox_ataque
                     and self.jugador.hitbox_ataque.colliderect(enemigo.shape)
                     and enemigo.vivo):
                 enemigo.recibir_daño(1)
 
-            # Combate: golpe del enemigo al jugador
+            # Golpe del enemigo al jugador (Enemigo_1)
             if (enemigo.hitbox_ataque
                     and enemigo.hitbox_ataque.colliderect(self.jugador.shape)):
                 self.jugador.recibir_daño(1)
 
+            # Proyectiles del Enemigo_2
+            if hasattr(enemigo, 'proyectiles'):
+                for p in enemigo.proyectiles:
+                    # Proyectil golpea al jugador
+                    if p.vivo and p.shape.colliderect(self.jugador.shape):
+                        self.jugador.recibir_daño(1.5)
+                        p.vivo = False
+                    # Jugador destruye el proyectil con espadazo
+                    if (p.vivo and self.jugador.hitbox_ataque
+                            and self.jugador.hitbox_ataque.colliderect(p.shape)):
+                        p.vivo = False
+
             if not enemigo.vivo:
                 muertos.append(i)
-
         # Eliminar muertos (en orden inverso para no alterar índices)
         for i in reversed(muertos):
             self.enemigos.pop(i)
@@ -686,3 +732,73 @@ class JuegoModel:
     def obtener_estados_enemigos(self):
         """Devuelve la lista de estados de todos los enemigos vivos."""
         return [e.obtener_estado() for e in self.enemigos]
+
+    class ProyectilModel:
+        """Proyectil lanzado por el Enemigo_2."""
+
+        VELOCIDAD = 4
+
+        def __init__(self, x, y, flip):
+            self.shape = pygame.Rect(0, 0,
+                                     int(Constantes.WIDTH_PERSONAJE * 0.8),
+                                     int(Constantes.HEIGHT_PERSONAJE * 0.8))
+            self.shape.center = (x, y)
+            self.flip = flip  # True = va a la izquierda
+            self.vivo = True
+
+        def actualizar(self, plataformas):
+            if not self.vivo:
+                return
+            self.shape.x += -self.VELOCIDAD if self.flip else self.VELOCIDAD
+            for plat in plataformas:
+                if self.shape.colliderect(plat.shape):
+                    self.vivo = False
+                    return
+
+        def obtener_estado(self):
+            return {
+                'pos': self.shape.center,
+                'flip': self.flip,
+                'vivo': self.vivo,
+            }
+class ProyectilModel:
+    """Proyectil lanzado por el Enemigo_2, apunta hacia el jugador."""
+
+    VELOCIDAD = 4
+
+    def __init__(self, x, y, target_x, target_y):
+        self.shape = pygame.Rect(0, 0,
+            int(Constantes.WIDTH_PERSONAJE * 0.8),
+            int(Constantes.HEIGHT_PERSONAJE * 0.8))
+        self.shape.center = (x, y)
+
+        # Calcular dirección normalizada hacia el jugador
+        import math
+        dx = target_x - x
+        dy = target_y - y
+        dist = math.hypot(dx, dy) or 1
+        self.vel_x = (dx / dist) * self.VELOCIDAD
+        self.vel_y = (dy / dist) * self.VELOCIDAD
+
+        self.flip  = dx < 0    # True = va a la izquierda
+        self.vivo  = True
+        self._x    = float(x)
+        self._y    = float(y)
+
+    def actualizar(self, plataformas):
+        if not self.vivo:
+            return
+        self._x += self.vel_x
+        self._y += self.vel_y
+        self.shape.center = (int(self._x), int(self._y))
+        for plat in plataformas:
+            if self.shape.colliderect(plat.shape):
+                self.vivo = False
+                return
+
+    def obtener_estado(self):
+        return {
+            'pos':  self.shape.center,
+            'flip': self.flip,
+            'vivo': self.vivo,
+        }
