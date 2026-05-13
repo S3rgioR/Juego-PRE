@@ -1,37 +1,35 @@
 """Punto de entrada del juego - Composición explícita del patrón MVP.
 
-Este módulo es responsable de:
+Responsabilidades de este módulo:
 1. Cargar todos los assets (imágenes, animaciones)
 2. Crear las tres capas del patrón MVP: Model, View, Presenter
 3. Conectar las capas entre sí
 4. Iniciar el game loop
 
-Arquitectura MVP:
-- Model  : estado del juego, física, IA, combate. Sin pygame gráfico.
-- View   : pygame, sprites, cámara, input, render. En la carpeta view/.
-- Presenter: intermediario. Se suscribe a eventos de la Vista y coordina el loop.
+Arquitectura MVP (física en la Vista):
+- Model   : reglas de juego, IA, combate, hp. Sin pygame gráfico ni posiciones.
+- View    : pygame, física, sprites, cámara, input, render.
+            Mueve los objetos, detecta colisiones y consulta al Model.
+- Presenter: intermediario. Se suscribe a eventos de la Vista y
+             coordina el loop.
 
-Orden de inicialización importante:
+Orden de inicialización:
 1. pygame.init()
 2. Calcular constantes de tamaño del personaje (requiere image.load, NO convert)
 3. Cargar frames de animación (image.load + scale, NO convert_alpha aún)
 4. Crear Model (no necesita pygame.display)
-5. Crear View → aquí se llama pygame.display.set_mode() y DESPUÉS se puede
+5. Crear View → aquí se llama pygame.display.set_mode() y después se puede
    usar convert_alpha(). El tileset y los fondos se cargan dentro de View.__init__.
 6. Crear Presenter y arrancar el loop.
 """
 
 import pygame
 import Constantes
-from model import JuegoModel
-from view import PygameView
+from model    import JuegoModel
+from view     import PygameView
 from presenter import JuegoPresenter
-from Nivel import cargar_nivel_1
+from Nivel    import cargar_nivel_1
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def escalar_img(image, scale):
     w = image.get_width()
@@ -49,10 +47,6 @@ def cargar_frames(patron, n, scale):
     return frames
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
 def main():
     """Carga assets, compone las capas MVP e inicia el game loop."""
 
@@ -60,10 +54,8 @@ def main():
 
     s = Constantes.SCALA_PERSONAJE
 
-    # Calcular dimensiones del personaje a partir de la primera imagen.
-    # Usamos image.load sin convert_alpha() porque aún no hay ventana.
-    # Sobreescribimos las constantes ANTES de construir Model o View,
-    # ya que ambos las necesitan para sus rects y hitboxes.
+    # Calcular dimensiones del personaje antes de crear la ventana.
+    # image.load sin convert_alpha() es seguro antes de set_mode().
     _img_ref = pygame.image.load(
         "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png"
     )
@@ -71,7 +63,6 @@ def main():
     Constantes.HEIGHT_PERSONAJE = int(_img_ref.get_height() * 0.35 * s)
 
     # --- Animaciones del jugador ---
-    # image.load + scale son seguros antes de crear la ventana.
     frames_jugador = {
         'Parado': cargar_frames(
             "Assets/Characters/Terrible Knight/Sprites/Idle/frame{}.png", 4, s),
@@ -90,15 +81,12 @@ def main():
         "Assets/Characters/Ogre/Sprites/walk/ogre-walk{}.png", 6, s)
     anim_ogre_attack = cargar_frames(
         "Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
-
-    # Animación del enemigo volador
     anim_volador_walk = cargar_frames(
         "Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
 
     # --- Datos de enemigos ---
-    # El Model usa 'x', 'y', 'distancia_patrulla', 'num_frames_ataque', 'tipo'.
-    # La Vista usa 'x', 'y', 'anim_walk', 'anim_attack', 'tipo'.
-    # Para tipo 'volador' no es necesario 'anim_attack' ni 'num_frames_ataque'.
+    # 'x', 'y' y 'distancia_patrulla' los usa el Model para fijar la IA.
+    # 'anim_walk' y 'anim_attack' los usa la Vista para crear los sprites.
     datos_enemigos = [
         {
             'tipo': 'terrestre',
@@ -118,7 +106,7 @@ def main():
         },
         {
             'tipo': 'volador',
-            'x': 1000, 'y': 300,          # Altura en el aire
+            'x': 1000, 'y': 400,
             'distancia_patrulla': 300,
             'anim_walk': anim_volador_walk,
         },
@@ -128,18 +116,14 @@ def main():
     # Composición MVP
     # ---------------------------------------------------------------------------
 
-    # 1. Model: estado y lógica. Solo necesita datos escalares de cada enemigo.
+    # 1. Model: reglas de juego. Solo necesita datos escalares de cada enemigo.
     modelo = JuegoModel(datos_enemigos)
 
-    # 2. View: pygame, sprites, cámara.
-    #    pygame.display.set_mode() se llama DENTRO de PygameView.__init__.
-    #    Por eso el tileset (que usa convert_alpha) también se carga dentro,
-    #    así como los fondos. NO se pasa tileset desde aquí.
+    # 2. View: física, sprites, cámara.
     vista = PygameView(
         frames_jugador=frames_jugador,
         datos_enemigos=datos_enemigos,
-        nivel_loader=cargar_nivel_1
-
+        nivel_loader=cargar_nivel_1,
     )
 
     # 3. Presenter: conecta Model y View, gestiona el game loop.
