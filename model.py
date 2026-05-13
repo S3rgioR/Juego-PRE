@@ -1,20 +1,29 @@
-"""Capa Model del patrón MVP - Estado y lógica del juego.
+"""Capa Model del patrón MVP - Reglas de juego, IA y combate.
 
 Responsabilidades:
-- Estado del jugador (posición, velocidad, hp, animación lógica)
-- Estado de los enemigos (patrulla, visión, ataque, hp)
-- Física (gravedad, colisiones con plataformas)
-- Combate (detección de golpes entre hitboxes)
+- Estado del jugador (hp, flags de acción, iframes)
+- Estado de los enemigos (patrulla, visión, cooldowns de ataque)
+- Reglas de combate: quién puede golpear a quién y cuánto daño hace
+- Responder a preguntas de la Vista: "¿qué ocurre si X colisiona con Y?"
 
 Lo que NO hace el Model:
-- Dibujar nada (ni un pixel)
-- Conocer pygame salvo para pygame.Rect (estructura geométrica)
+- Dibujar nada
+- Mover objetos (no modifica posiciones directamente)
+- Detectar colisiones (esa responsabilidad es de la Vista)
 - Gestionar eventos de teclado
 - Gestionar la cámara
 
-El Model expone su estado mediante `obtener_estado_jugador()` y
-`obtener_estados_enemigos()`, que devuelven dicts que la Vista
-usa para sincronizar sus sprites.
+Filosofía de esta arquitectura:
+    La Vista mueve los objetos, detecta colisiones y consulta al Model
+    qué consecuencia tiene cada interacción. El Model responde modificando
+    su estado interno (hp, flags) y devolviendo instrucciones de corrección
+    geométrica cuando la Vista las necesita.
+
+Jerarquía de clases:
+    Actor               ← clase base con hp, iframes, flip, patrulla
+    ├── JugadorModel    ← añade salto, coyote time, animación de ataque
+    ├── Enemigo1Model   ← añade IA terrestre, ventana de golpe cuerpo a cuerpo
+    └── Enemigo2Model   ← añade IA voladora, disparo de proyectiles
 """
 
 import pygame
@@ -22,429 +31,343 @@ import Constantes
 
 
 # ---------------------------------------------------------------------------
-# Sub-modelo: Jugador
+# Clase base: Actor
 # ---------------------------------------------------------------------------
 
-class JugadorModel:
-    """Estado y física del jugador.
+class Actor:
+    """Estado lógico común a toda entidad con vida del juego.
+
+    Encapsula los atributos y comportamientos que comparten el jugador
+    y todos los tipos de enemigo: puntos de vida, invencibilidad temporal
+    (iframes), orientación y física vertical básica.
+
+    Las subclases añaden la lógica específica de cada rol
+    (control del jugador, IA de patrulla, disparo, etc.).
 
     Attributes
     ----------
-    shape : pygame.Rect
-        Hitbox en coordenadas de mundo (fuente de verdad geométrica).
-    velocidad_y : float
-        Velocidad vertical actual. Positiva = cayendo.
-    en_suelo : bool
-        True si el jugador está apoyado sobre algo.
     flip : bool
-        True = mirando a la izquierda.
-    moviendose : bool
-        True si el jugador se está moviendo horizontalmente este frame.
-    atacando : bool
-        True durante el transcurso de un ataque.
-    hitbox_ataque : pygame.Rect or None
-        Hitbox de ataque activa, o None.
-    coyote_timer : int
-        Milisegundos restantes de coyote time (permite saltar tras caer del borde).
+        True = mirando a la izquierda, False = a la derecha.
     hp : int
         Puntos de vida actuales.
     vivo : bool
         False cuando hp llega a 0.
-    _frame_index : int
-        Frame actual de la animación (gestionado aquí para saber cuándo termina el ataque).
-    _update_time : int
-        Timestamp del último cambio de frame.
+    iframe_duracion : int
+        Milisegundos de invencibilidad tras recibir daño.
+    iframe_timer : int
+        Milisegundos restantes de invencibilidad activa.
+    velocidad_y : float
+        Velocidad vertical actual. La Vista la aplica y la actualiza.
+    en_suelo : bool
+        True si la Vista ha notificado contacto con una superficie.
+    atacando : bool
+        True durante el transcurso de un ataque.
+    hitbox_ataque : pygame.Rect or None
+        Hitbox activa durante la ventana de golpe, o None.
     """
 
-    COYOTE_TIME = 300      # ms de margen para saltar tras caer del borde
-    COOLDOWN_ANIM = 70     # ms entre frames de animación
+    def __init__(self, hp, iframe_duracion):
+        self.flip        = False
+        self.hp          = hp
+        self.vivo        = True
+        self.iframe_duracion = iframe_duracion
+        self.iframe_timer    = 0
 
-    def __init__(self, x, y):
-        self.shape = pygame.Rect(
-            0, 0,
-            Constantes.WIDTH_PERSONAJE,
-            Constantes.HEIGHT_PERSONAJE
-        )
-        self.shape.center = (x, y)
-        self._y = float(self.shape.y)  # acumulador float para evitar truncado
+        self.velocidad_y  = 0.0
+        self.en_suelo     = False
 
-        self.velocidad_y   = 0
-        self.en_suelo      = False
-        self.flip          = False
-        self.moviendose    = False
         self.atacando      = False
         self.hitbox_ataque = None
 
-        self.coyote_time = 300
-        self.coyote_timer = 0
-        self.hp   = 5
-        self.vivo = True
+    # --- Combate ---
 
-        # Para saber cuándo termina la animación de ataque
-        self._frame_index  = 0
-        self._update_time  = pygame.time.get_ticks()
-        self._num_frames_ataque = 4   # se actualiza cuando el Presenter informa
+    def recibir_daño(self, cantidad):
+        """Aplica daño si el actor no está en iframes.
 
-        self.iframe_duracion = 1000  # ms de invencibilidad tras recibir golpe
-        self.iframe_timer = 0  # ms restantes de invencibilidad
-    # --- Acciones (llamadas por el Presenter) ---
-
-    def iniciar_ataque(self, num_frames):
-        """Inicia el ataque si no hay uno en curso.
+        Si los puntos de vida llegan a 0, marca al actor como muerto.
 
         Parameters
         ----------
-        num_frames : int
-            Número de frames de la animación de ataque (para saber cuándo termina).
+        cantidad : int or float
+            Puntos de daño a restar.
         """
-        if not self.atacando:
-            self.atacando = True
-            self._frame_index = 0
-            self._num_frames_ataque = num_frames
-            self._update_time = pygame.time.get_ticks()
-
-    def saltar(self):
-        """Aplica velocidad de salto si está en suelo o en coyote time."""
-        if self.en_suelo or self.coyote_timer > 0:
-            self.velocidad_y  = Constantes.FUERZA_SALTO
-            self.en_suelo     = False
-            self.coyote_timer = 0
-
-    def recibir_daño(self, daño):
-        if not self.vivo or self.iframe_timer > 0:  # ← ignorar si hay iframes
-            return
-        self.hp -= daño
-        self.iframe_timer = self.iframe_duracion  # ← activar invencibilidad
-        if self.hp <= 0:
-            self.hp = 0
-            self.vivo = False
-
-    # --- Física (llamada cada frame por el Model principal) ---
-
-    def actualizar(self, delta_x, plataformas, delta_time_ms):
-        """Aplica movimiento, física y colisiones para este frame.
-
-        Parameters
-        ----------
-        delta_x : int
-            Desplazamiento horizontal solicitado (-VELOCIDAD, 0 o +VELOCIDAD).
-        plataformas : list of Plataforma
-            Lista de plataformas con su shape (pygame.Rect).
-        delta_time_ms : int
-            Milisegundos transcurridos desde el último frame (para coyote time).
-        """
-        # --- Dirección ---
-        if delta_x < 0:
-            self.flip = True
-            self.moviendose = True
-        elif delta_x > 0:
-            self.flip = False
-            self.moviendose = True
-        else:
-            self.moviendose = False
-
-        # --- Movimiento horizontal + colisiones ---
-        self.shape.x += delta_x
-        for plat in plataformas:
-            if self.shape.colliderect(plat.shape):
-                if delta_x > 0:
-                    self.shape.right = plat.shape.left
-                elif delta_x < 0:
-                    self.shape.left = plat.shape.right
-        if self.iframe_timer > 0:
-            self.iframe_timer -= delta_time_ms
-        # --- Gravedad (ANTES del movimiento vertical) ---
-        # Aplicarla aqui garantiza que cuando la colision resetea velocidad_y=0,
-        # ese 0 es el valor que exporta obtener_estado() este mismo frame.
-        # Si se aplicara despues, el personaje saldria con vel_y=0.6 aunque
-        # este en suelo, haciendo parpadear la animacion entre Parado y Saltando.
-        self.velocidad_y += Constantes.GRAVEDAD
-        if self.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
-            self.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
-
-        # --- Movimiento vertical + colisiones ---
-        # Bug sin este fix: pygame.colliderect solo detecta solapamiento
-        # real (bottom > top), nunca contacto (bottom == top).
-        # Con int(vel_y=0.6)=0 el personaje no baja → no solapa → en_suelo=False
-        # Alternando frames: un frame toca sin solapar, el siguiente solapa.
-        # Resultado: parpadeo entre sprite de suelo y sprite de salto.
-        # Fix: acumular en float (_y) y forzar +1 pixel en el test,
-        # luego recolocar exactamente encima si hay colisión.
-        self.en_suelo = False
-        self._y += self.velocidad_y
-        self.shape.y = int(self._y) + 1  # +1 fuerza solapamiento en colliderect
-
-        for plat in plataformas:
-            if self.shape.colliderect(plat.shape):
-                if self.velocidad_y >= 0:  # cayendo o en reposo
-                    self.shape.bottom = plat.shape.top
-                    self._y = float(self.shape.y)  # resync sin el +1
-                    self.velocidad_y  = 0
-                    self.en_suelo     = True
-                elif self.velocidad_y < 0:
-                    self.shape.top   = plat.shape.bottom
-                    self._y = float(self.shape.y)
-                    self.velocidad_y = 0
-
-        # --- Coyote time ---
-        if self.en_suelo:
-            self.coyote_timer = self.COYOTE_TIME
-        else:
-            self.coyote_timer -= delta_time_ms
-            if self.coyote_timer < 0:
-                self.coyote_timer = 0
-
-        # --- Fin del ataque (basado en frames de animación) ---
-        if self.atacando:
-            if pygame.time.get_ticks() - self._update_time > self.COOLDOWN_ANIM:
-                self._frame_index += 1
-                self._update_time = pygame.time.get_ticks()
-            if self._frame_index >= self._num_frames_ataque:
-                self.atacando      = False
-                self.hitbox_ataque = None
-                self._frame_index  = 0
-
-        # --- Hitbox de ataque ---
-        if self.atacando:
-            self.hitbox_ataque = self._calcular_hitbox_ataque()
-
-        # --- Límites de pantalla ---
-        if self.shape.bottom >= Constantes.HEIGHT:
-            self.shape.bottom = Constantes.HEIGHT
-            self._y = float(self.shape.y)
-            self.velocidad_y  = 0
-            self.en_suelo     = True
-        if self.shape.top < 0:
-            self.shape.top   = 0
-            self._y = float(self.shape.y)
-            self.velocidad_y = 0
-
-    def _calcular_hitbox_ataque(self):
-        ancho_hit = Constantes.WIDTH_PERSONAJE * 3
-        if self.flip:
-            x = self.shape.left - ancho_hit
-        else:
-            x = self.shape.right
-        return pygame.Rect(x, self.shape.top, ancho_hit, self.shape.height)
-
-
-    def obtener_estado(self):
-            """Devuelve un dict con el estado lógico para que la Vista sincronice su sprite.
-
-            Returns
-            -------
-            dict
-                Claves: 'pos', 'flip', 'atacando', 'en_suelo', 'moviendose',
-                        'hitbox_ataque', 'vivo', 'hp'.
-            """
-            return {
-                'pos': self.shape.center,
-                'flip': self.flip,
-                'atacando': self.atacando,
-                'en_suelo': self.en_suelo,
-                'moviendose': self.moviendose,
-                'hitbox_ataque': self.hitbox_ataque,
-                'vivo': self.vivo,
-                'hp': self.hp,
-                'iframe_activo': self.iframe_timer > 0,
-            }
-
-
-# ---------------------------------------------------------------------------
-# Sub-modelo: Enemigo_1
-# ---------------------------------------------------------------------------
-
-class Enemigo1Model:
-    """Estado y física del primer tipo de enemigo.
-
-    Attributes
-    ----------
-    shape : pygame.Rect
-        Hitbox en coordenadas de mundo.
-    velocidad_y : float
-        Velocidad vertical actual.
-    en_suelo : bool
-        True si está apoyado sobre una plataforma.
-    flip : bool
-        True = mirando a la izquierda.
-    velocidad : int
-        Velocidad horizontal de patrulla.
-    patrol_min, patrol_max : int
-        Límites horizontales de la patrulla.
-    hp : int
-        Puntos de vida.
-    vivo : bool
-        False cuando hp llega a 0.
-    atacando : bool
-        True durante el ataque.
-    hitbox_ataque : pygame.Rect or None
-        Hitbox de ataque activa.
-    rango_vision : int
-        Distancia máxima de detección del jugador (px).
-    cooldown_ataque : int
-        Milisegundos entre ataques.
-    ultimo_ataque : int
-        Timestamp del último ataque iniciado.
-    _frame_index : int
-        Frame actual (para saber cuándo termina la animación de ataque).
-    _update_time : int
-        Timestamp del último cambio de frame.
-    _num_frames_ataque : int
-        Número de frames de la animación de ataque.
-    """
-
-    COOLDOWN_ANIM = 200  # ms entre frames
-
-    def __init__(self, x, y, distancia_patrulla=150, num_frames_ataque=6):
-        self.shape = pygame.Rect(
-            0, 0,
-            int(Constantes.WIDTH_PERSONAJE * 2),
-            int(Constantes.HEIGHT_PERSONAJE * 1.5)
-        )
-        self.shape.center = (x, y)
-
-        self.velocidad_y = 0
-        self.en_suelo    = False
-        self.flip        = True
-
-        self.velocidad    = 2
-        self.patrol_min   = x - distancia_patrulla
-        self.patrol_max   = x + distancia_patrulla
-
-        self.hp   = 5
-        self.vivo = True
-
-        self.rango_vision    = 100
-        self.atacando        = False
-        self.hitbox_ataque   = None
-        self.cooldown_ataque = 1200
-        self.ultimo_ataque   = -self.cooldown_ataque  # listo desde el inicio
-
-        self._frame_index        = 0
-        self._update_time        = pygame.time.get_ticks()
-        self._num_frames_ataque  = num_frames_ataque
-
-        self.ataque_frame_inicio = 2  # frame en que aparece la hitbox
-        self.ataque_frame_fin = 5  # frame en que desaparece
-
-        self.iframe_duracion = 600  # ms de invencibilidad tras recibir golpe
-        self.iframe_timer = 0  # ms restantes de invencibilidad
-
-    def recibir_daño(self, daño):
-        """Reduce hp. Ignora el golpe si hay iframes activos."""
         if not self.vivo or self.iframe_timer > 0:
             return
-        self.hp -= daño
+        self.hp -= cantidad
         self.iframe_timer = self.iframe_duracion
         if self.hp <= 0:
-            self.hp = 0
+            self.hp   = 0
             self.vivo = False
 
-    def actualizar(self, plataformas, jugador_model, delta_time_ms=16):
-        """Actualiza el estado del enemigo para este frame."""
-        if not self.vivo:
-            return
-
-        # Descontar iframe timer
+    def _tick_iframes(self, delta_time_ms):
+        """Descuenta el temporizador de iframes. Llamado por las subclases."""
         if self.iframe_timer > 0:
             self.iframe_timer -= delta_time_ms
             if self.iframe_timer < 0:
                 self.iframe_timer = 0
 
-        ahora = pygame.time.get_ticks()
-        cooldown_listo = (ahora - self.ultimo_ataque) >= self.cooldown_ataque
+    # --- Notificaciones de la Vista (física vertical) ---
 
-        if self._jugador_en_vision(jugador_model) and cooldown_listo and not self.atacando:
-            # Iniciar ataque — hitbox empieza None, hit window la activará
-            self.atacando = True
-            self._frame_index = 0
-            self._update_time = ahora
-            self.ultimo_ataque = ahora
-        elif not self.atacando:
-            self.hitbox_ataque = None
-            self._patrullar()
+    def notificar_en_suelo(self):
+        """La Vista informa de que el actor ha aterrizado sobre una superficie."""
+        self.en_suelo    = True
+        self.velocidad_y = 0
 
-        # Avance de animación y hit window
-        if self.atacando:
-            if pygame.time.get_ticks() - self._update_time > self.COOLDOWN_ANIM:
-                self._frame_index += 1
-                self._update_time = pygame.time.get_ticks()
-            if self._frame_index >= self._num_frames_ataque:
-                self.atacando = False
-                self.hitbox_ataque = None
-                self._frame_index = 0
-            elif self.ataque_frame_inicio <= self._frame_index <= self.ataque_frame_fin:
-                self.hitbox_ataque = self._calcular_hitbox_ataque()
-            else:
-                self.hitbox_ataque = None
+    def notificar_golpe_techo(self):
+        """La Vista informa de que el actor ha chocado con una superficie por encima."""
+        self.velocidad_y = 0
 
-        self._movimiento(plataformas)
+    # --- Patrulla horizontal (compartida por los dos tipos de enemigo) ---
 
-    def _patrullar(self):
-        if self.shape.x <= self.patrol_min:
-            self.flip = False
-        elif self.shape.right >= self.patrol_max:
-            self.flip = True
-        self.shape.x += -self.velocidad if self.flip else self.velocidad
+    def _calcular_patrulla(self, pos_x):
+        """Devuelve el desplazamiento horizontal de patrulla para este frame.
 
-    def _movimiento(self, plataformas):
-        # Gravedad
-        self.velocidad_y += Constantes.GRAVEDAD
-        if self.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
-            self.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
+        Invierte la dirección al alcanzar los límites de la zona asignada.
+        Requiere que la subclase haya definido patrol_min, patrol_max y velocidad.
 
-        # Colisiones horizontales con plataformas
-        for plat in plataformas:
-            if self.shape.colliderect(plat.shape):
-                if self.flip:
-                    self.shape.left = plat.shape.right
-                    self.flip = False
-                else:
-                    self.shape.right = plat.shape.left
-                    self.flip = True
-
-        # Colisiones verticales con plataformas
-        self.en_suelo = False
-        self.shape.y += int(self.velocidad_y)
-
-        for plat in plataformas:
-            if self.shape.colliderect(plat.shape):
-                if self.velocidad_y > 0:
-                    self.shape.bottom = plat.shape.top
-                    self.velocidad_y  = 0
-                    self.en_suelo     = True
-                elif self.velocidad_y < 0:
-                    self.shape.top   = plat.shape.bottom
-                    self.velocidad_y = 0
-
-    def _jugador_en_vision(self, jugador_model):
-        dx = jugador_model.shape.centerx - self.shape.centerx
-        mirando_al_jugador = (self.flip and dx < 0) or (not self.flip and dx > 0)
-        cerca = abs(dx) <= self.rango_vision
-        return mirando_al_jugador and cerca
-
-    def _calcular_hitbox_ataque(self):
-        ancho_hit = Constantes.WIDTH_PERSONAJE * 4
-        if self.flip:
-            x = self.shape.left - ancho_hit
-        else:
-            x = self.shape.right
-        return pygame.Rect(x, self.shape.top, ancho_hit, self.shape.height)
-
-    def obtener_estado(self):
-        """Devuelve un dict con el estado lógico para que la Vista sincronice su sprite.
+        Parameters
+        ----------
+        pos_x : int
+            Posición horizontal actual del centro del sprite.
 
         Returns
         -------
-        dict
-            Claves: 'pos', 'flip', 'atacando', 'hitbox_ataque', 'vivo'.
+        int
+            Desplazamiento a aplicar (+velocidad o -velocidad).
+        """
+        if pos_x <= self.patrol_min:
+            self.flip = False
+        elif pos_x >= self.patrol_max:
+            self.flip = True
+        return -self.velocidad if self.flip else self.velocidad
+
+
+# ---------------------------------------------------------------------------
+# Sub-modelo: Jugador
+# ---------------------------------------------------------------------------
+
+class JugadorModel(Actor):
+    """Estado lógico del jugador.
+
+    Extiende Actor con el control de entrada del jugador: salto con
+    coyote time y animación de ataque con contador de frames.
+
+    Attributes
+    ----------
+    moviendose : bool
+        True si el jugador se desplaza horizontalmente este frame.
+    coyote_timer : int
+        Milisegundos restantes de margen para saltar tras caer del borde.
+    """
+
+    COYOTE_TIME   = 300   # ms de margen para saltar tras caer del borde
+    COOLDOWN_ANIM = 70    # ms entre frames de la animación de ataque
+
+    def __init__(self):
+        super().__init__(hp=5, iframe_duracion=1000)
+        self.flip         = False
+        self.moviendose   = False
+        self.coyote_timer = 0
+
+        self._frame_index       = 0
+        self._update_time       = 0
+        self._num_frames_ataque = 4
+
+    # --- Acciones (iniciadas por el Presenter) ---
+
+    def iniciar_ataque(self, num_frames):
+        """Inicia el ataque si no hay uno ya en curso."""
+        if not self.atacando:
+            self.atacando           = True
+            self._frame_index       = 0
+            self._num_frames_ataque = num_frames
+            self._update_time       = pygame.time.get_ticks()
+
+    def saltar(self):
+        """Aplica velocidad de salto si el jugador está en suelo o en coyote time."""
+        if self.en_suelo or self.coyote_timer > 0:
+            self.velocidad_y  = Constantes.FUERZA_SALTO
+            self.en_suelo     = False
+            self.coyote_timer = 0
+
+    # --- Notificaciones de la Vista ---
+
+    def notificar_en_suelo(self):
+        """Aterriza y recarga el coyote timer."""
+        super().notificar_en_suelo()
+        self.coyote_timer = self.COYOTE_TIME
+
+    def notificar_en_aire(self, delta_time_ms):
+        """La Vista informa de que el jugador no toca ninguna superficie."""
+        self.en_suelo      = False
+        self.coyote_timer -= delta_time_ms
+        if self.coyote_timer < 0:
+            self.coyote_timer = 0
+
+    # --- Tick interno ---
+
+    def tick(self, delta_time_ms):
+        """Avanza el contador de iframes y la animación de ataque."""
+        self._tick_iframes(delta_time_ms)
+
+        if self.atacando:
+            if pygame.time.get_ticks() - self._update_time > self.COOLDOWN_ANIM:
+                self._frame_index += 1
+                self._update_time  = pygame.time.get_ticks()
+            if self._frame_index >= self._num_frames_ataque:
+                self.atacando     = False
+                self._frame_index = 0
+
+    # --- Exportar estado ---
+
+    def obtener_estado(self, pos, hitbox_ataque):
+        """Devuelve el estado completo para que la Vista sincronice su sprite.
+
+        Parameters
+        ----------
+        pos : tuple(int, int)
+            Centro del sprite (lo conoce la Vista, no el Model).
+        hitbox_ataque : pygame.Rect or None
+            Calculada por la Vista a partir de la posición actual.
         """
         return {
-            'pos': self.shape.center,
-            'flip': self.flip,
-            'atacando': self.atacando,
+            'pos':           pos,
+            'flip':          self.flip,
+            'atacando':      self.atacando,
+            'en_suelo':      self.en_suelo,
+            'moviendose':    self.moviendose,
+            'hitbox_ataque': hitbox_ataque,
+            'vivo':          self.vivo,
+            'hp':            self.hp,
+            'iframe_activo': self.iframe_timer > 0,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Sub-modelo: Enemigo_1 (terrestre)
+# ---------------------------------------------------------------------------
+
+class Enemigo1Model(Actor):
+    """Estado lógico del primer tipo de enemigo: patrullador terrestre.
+
+    Extiende Actor con IA de patrulla, detección visual del jugador
+    y ataque cuerpo a cuerpo con ventana de golpe por frames.
+
+    Attributes
+    ----------
+    velocidad : int
+        Píxeles por frame de desplazamiento horizontal.
+    patrol_min, patrol_max : int
+        Límites de la zona de patrulla en coordenadas de mundo.
+    rango_vision : int
+        Distancia horizontal máxima de detección del jugador (px).
+    cooldown_ataque : int
+        Milisegundos mínimos entre ataques consecutivos.
+    """
+
+    COOLDOWN_ANIM = 200   # ms entre frames de la animación de ataque
+
+    def __init__(self, x, y, distancia_patrulla=150, num_frames_ataque=6):
+        super().__init__(hp=5, iframe_duracion=600)
+        self.flip      = True
+        self.velocidad = 2
+
+        self.patrol_min = x - distancia_patrulla
+        self.patrol_max = x + distancia_patrulla
+
+        self.rango_vision    = 100
+        self.cooldown_ataque = 1200
+        self.ultimo_ataque   = -self.cooldown_ataque
+
+        self._frame_index       = 0
+        self._update_time       = pygame.time.get_ticks()
+        self._num_frames_ataque = num_frames_ataque
+
+        self.ataque_frame_inicio = 2
+        self.ataque_frame_fin    = 5
+
+    # --- IA ---
+
+    def tick_ia(self, pos_enemigo, pos_jugador, delta_time_ms):
+        """Avanza la lógica de IA para este frame.
+
+        Devuelve las instrucciones de movimiento que la Vista debe aplicar.
+
+        Parameters
+        ----------
+        pos_enemigo : tuple(int, int)
+            Centro actual del sprite (lo conoce la Vista).
+        pos_jugador : tuple(int, int)
+            Centro actual del sprite del jugador.
+        delta_time_ms : int
+            Milisegundos desde el último frame.
+
+        Returns
+        -------
+        delta_x : int
+            Desplazamiento horizontal a aplicar este frame (0 si está atacando).
+        hitbox_ataque : pygame.Rect or None
+            Hitbox activa durante la ventana de golpe, o None.
+        """
+        if not self.vivo:
+            return 0, None
+
+        self._tick_iframes(delta_time_ms)
+
+        ahora          = pygame.time.get_ticks()
+        cooldown_listo = (ahora - self.ultimo_ataque) >= self.cooldown_ataque
+
+        ex, ey = pos_enemigo
+        jx, _  = pos_jugador
+        dx     = jx - ex
+
+        en_vision = (
+            ((self.flip and dx < 0) or (not self.flip and dx > 0))
+            and abs(dx) <= self.rango_vision
+        )
+
+        if en_vision and cooldown_listo and not self.atacando:
+            self.atacando      = True
+            self._frame_index  = 0
+            self._update_time  = ahora
+            self.ultimo_ataque = ahora
+
+        delta_x = 0
+        if not self.atacando:
+            self.hitbox_ataque = None
+            delta_x = self._calcular_patrulla(ex)
+        else:
+            if pygame.time.get_ticks() - self._update_time > self.COOLDOWN_ANIM:
+                self._frame_index += 1
+                self._update_time  = pygame.time.get_ticks()
+
+            if self._frame_index >= self._num_frames_ataque:
+                self.atacando      = False
+                self.hitbox_ataque = None
+                self._frame_index  = 0
+            elif self.ataque_frame_inicio <= self._frame_index <= self.ataque_frame_fin:
+                self.hitbox_ataque = self._calcular_hitbox_ataque(ex, ey)
+            else:
+                self.hitbox_ataque = None
+
+        return delta_x, self.hitbox_ataque
+
+    def _calcular_hitbox_ataque(self, ex, ey):
+        ancho_hit  = Constantes.WIDTH_PERSONAJE * 4
+        alto_hit   = int(Constantes.HEIGHT_PERSONAJE * 1.5)
+        mitad_body = int(Constantes.WIDTH_PERSONAJE)
+        x = (ex - mitad_body - ancho_hit) if self.flip else (ex + mitad_body)
+        return pygame.Rect(x, ey - alto_hit // 2, ancho_hit, alto_hit)
+
+    # --- Exportar estado ---
+
+    def obtener_estado(self, pos):
+        return {
+            'pos':           pos,
+            'flip':          self.flip,
+            'atacando':      self.atacando,
             'hitbox_ataque': self.hitbox_ataque,
-            'vivo': self.vivo,
+            'vivo':          self.vivo,
             'iframe_activo': self.iframe_timer > 0,
         }
 
@@ -453,152 +376,154 @@ class Enemigo1Model:
 # Sub-modelo: Enemigo_2 (volador)
 # ---------------------------------------------------------------------------
 
-class Enemigo2Model:
-    """Estado y física del segundo tipo de enemigo: patrullador volador.
+class Enemigo2Model(Actor):
+    """Estado lógico del segundo tipo de enemigo: patrullador volador.
 
-    Se mueve horizontalmente como el Enemigo_1 pero no aplica gravedad
-    ni necesita plataformas para sostenerse. Tampoco puede atacar, por lo
-    que hitbox_ataque es siempre None.
+    Extiende Actor con IA de patrulla aérea y disparo de proyectiles
+    dirigidos al jugador. No aplica gravedad ni necesita plataformas.
 
     Attributes
     ----------
-    shape : pygame.Rect
-        Hitbox en coordenadas de mundo.
-    flip : bool
-        True = mirando a la izquierda.
     velocidad : int
-        Velocidad horizontal de patrulla.
+        Píxeles por frame de patrulla horizontal.
     patrol_min, patrol_max : int
-        Límites horizontales de la patrulla.
-    hp : int
-        Puntos de vida.
-    vivo : bool
-        False cuando hp llega a 0.
-    hitbox_ataque : None
-        Siempre None: este enemigo no ataca.
-    iframe_duracion : int
-        ms de invencibilidad tras recibir un golpe.
-    iframe_timer : int
-        ms restantes de invencibilidad.
+        Límites de la zona de patrulla.
+    rango_vision : int
+        Distancia máxima de detección del jugador (px).
+    cooldown_disparo : int
+        Milisegundos mínimos entre disparos consecutivos.
+    proyectiles : list of ProyectilModel
+        Proyectiles activos disparados por este enemigo.
     """
 
     def __init__(self, x, y, distancia_patrulla=150):
-        self.shape = pygame.Rect(
-            0, 0,
-            int(Constantes.WIDTH_PERSONAJE * 2),
-            int(Constantes.HEIGHT_PERSONAJE * 1.5)
-        )
-        self.shape.center = (x, y)
-
+        super().__init__(hp=3, iframe_duracion=600)
         self.flip      = True
         self.velocidad = 2
 
         self.patrol_min = x - distancia_patrulla
         self.patrol_max = x + distancia_patrulla
 
-        self.hp   = 3
-        self.vivo = True
+        self.rango_vision     = 450
+        self.cooldown_disparo = 1000
+        self.ultimo_disparo   = -2000
+        self.proyectiles      = []
 
-        # Este enemigo nunca ataca
-        self.atacando      = False
-        self.hitbox_ataque = None
+    # --- IA ---
 
-        self.iframe_duracion = 600
-        self.iframe_timer    = 0
+    def tick_ia(self, pos_enemigo, pos_jugador, delta_time_ms):
+        """Avanza la lógica de IA para este frame.
 
-        self.rango_vision = 450
-        self.cooldown_disparo = 1000  # ms entre disparos
-        self.ultimo_disparo = -2000
-        self.proyectiles = []  # lista de ProyectilModel
+        Devuelve las instrucciones de movimiento que la Vista debe aplicar.
 
-    def recibir_daño(self, daño):
-        """Reduce hp. Ignora el golpe si hay iframes activos."""
-        if not self.vivo or self.iframe_timer > 0:
-            return
-        self.hp -= daño
-        self.iframe_timer = self.iframe_duracion
-        if self.hp <= 0:
-            self.hp = 0
-            self.vivo = False
+        Parameters
+        ----------
+        pos_enemigo : tuple(int, int)
+            Centro actual del sprite (lo conoce la Vista).
+        pos_jugador : tuple(int, int)
+            Centro actual del sprite del jugador.
+        delta_time_ms : int
+            Milisegundos desde el último frame.
 
-    def actualizar(self, plataformas, jugador_model, delta_time_ms=16):
+        Returns
+        -------
+        delta_x : int
+            Desplazamiento horizontal de patrulla.
+        nuevos_proyectiles : list of ProyectilModel
+            Proyectiles recién creados este frame (lista vacía si ninguno).
+        """
         if not self.vivo:
-            return
+            return 0, []
 
-        if self.iframe_timer > 0:
-            self.iframe_timer -= delta_time_ms
-            if self.iframe_timer < 0:
-                self.iframe_timer = 0
+        self._tick_iframes(delta_time_ms)
 
-        self._patrullar()
+        import math
+        ex, ey = pos_enemigo
+        jx, jy = pos_jugador
 
-        for p in self.proyectiles:
-            p.actualizar(plataformas)
-        self.proyectiles = [p for p in self.proyectiles if p.vivo]
+        delta_x   = self._calcular_patrulla(ex)
+        en_vision = math.hypot(jx - ex, jy - ey) <= self.rango_vision
 
-        ahora = pygame.time.get_ticks()
-        if (self._jugador_en_vision(jugador_model)
-                and ahora - self.ultimo_disparo >= self.cooldown_disparo):
-            self.proyectiles.append(
-                ProyectilModel(
-                    self.shape.centerx, self.shape.centery,
-                    jugador_model.shape.centerx, jugador_model.shape.centery
-                )
-            )
+        nuevos = []
+        ahora  = pygame.time.get_ticks()
+        if en_vision and (ahora - self.ultimo_disparo) >= self.cooldown_disparo:
+            p = ProyectilModel(ex, ey, jx, jy)
+            self.proyectiles.append(p)
+            nuevos.append(p)
             self.ultimo_disparo = ahora
 
-    def _patrullar(self):
-        """Mueve el enemigo horizontalmente entre patrol_min y patrol_max."""
-        if self.shape.x <= self.patrol_min:
-            self.flip = False
-        elif self.shape.right >= self.patrol_max:
-            self.flip = True
-        self.shape.x += -self.velocidad if self.flip else self.velocidad
+        return delta_x, nuevos
 
-    def obtener_estado(self):
-        """Devuelve el estado lógico para que la Vista sincronice su sprite."""
+    # --- Exportar estado ---
+
+    def obtener_estado(self, pos):
         return {
-            'pos':           self.shape.center,
+            'pos':           pos,
             'flip':          self.flip,
             'atacando':      False,
             'hitbox_ataque': None,
             'vivo':          self.vivo,
             'iframe_activo': self.iframe_timer > 0,
+            'proyectiles':   [p.obtener_estado() for p in self.proyectiles],
         }
 
 
-    def _jugador_en_vision(self, jugador_model):
-        dx = jugador_model.shape.centerx - self.shape.centerx
-        dy = jugador_model.shape.centery - self.shape.centery
+# ---------------------------------------------------------------------------
+# Proyectil
+# ---------------------------------------------------------------------------
+
+class ProyectilModel:
+    """Proyectil lanzado por Enemigo2Model, dirigido hacia el jugador.
+
+    La Vista mueve el proyectil cada frame usando vel_x y vel_y, y notifica
+    al Model cuando colisiona con el jugador o con una plataforma.
+    """
+
+    VELOCIDAD = 4
+
+    def __init__(self, x, y, target_x, target_y):
         import math
-        return math.hypot(dx, dy) <= self.rango_vision
+        self.shape = pygame.Rect(
+            0, 0,
+            int(Constantes.WIDTH_PERSONAJE  * 0.8),
+            int(Constantes.HEIGHT_PERSONAJE * 0.8),
+        )
+        self.shape.center = (x, y)
+
+        dx   = target_x - x
+        dy   = target_y - y
+        dist = math.hypot(dx, dy) or 1
+        self.vel_x = (dx / dist) * self.VELOCIDAD
+        self.vel_y = (dy / dist) * self.VELOCIDAD
+
+        self.flip = dx < 0
+        self.vivo = True
+        self._x   = float(x)
+        self._y   = float(y)
 
     def obtener_estado(self):
         return {
-            'pos': self.shape.center,
+            'pos':  self.shape.center,
             'flip': self.flip,
-            'atacando': False,
-            'hitbox_ataque': None,
             'vivo': self.vivo,
-            'iframe_activo': self.iframe_timer > 0,
-            'proyectiles': [p.obtener_estado() for p in self.proyectiles],
         }
+
 
 # ---------------------------------------------------------------------------
 # Model principal del juego
 # ---------------------------------------------------------------------------
 
 class JuegoModel:
-    """Gestiona el estado completo del juego.
+    """Gestiona el estado completo del juego: jugador, enemigos y combate.
 
-    Contiene el jugador y la lista de enemigos, y delega en ellos
-    la física y la lógica de combate cada frame.
+    Actúa como fachada: la Vista y el Presenter acceden al estado
+    del juego a través de esta clase.
 
     Attributes
     ----------
     jugador : JugadorModel
         Sub-modelo del jugador.
-    enemigos : list of Enemigo1Model
+    enemigos : list of Actor
         Lista de sub-modelos de enemigos vivos.
     mover_derecha : bool
         True mientras la tecla D está pulsada.
@@ -607,30 +532,21 @@ class JuegoModel:
     """
 
     def __init__(self, datos_enemigos):
-        """Inicializa el Model con el jugador y los enemigos.
-
-        Parameters
-        ----------
-        datos_enemigos : list of dict
-            Lista de dicts con {'x', 'y', 'distancia_patrulla', 'num_frames_ataque'}.
-        """
-        self.jugador = JugadorModel(250, 250)
+        self.jugador = JugadorModel()
 
         self.enemigos = []
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
                 self.enemigos.append(
                     Enemigo2Model(
-                        d['x'],
-                        d['y'],
+                        d['x'], d['y'],
                         distancia_patrulla=d.get('distancia_patrulla', 150),
                     )
                 )
             else:
                 self.enemigos.append(
                     Enemigo1Model(
-                        d['x'],
-                        d['y'],
+                        d['x'], d['y'],
                         distancia_patrulla=d.get('distancia_patrulla', 150),
                         num_frames_ataque=d.get('num_frames_ataque', 6),
                     )
@@ -659,146 +575,60 @@ class JuegoModel:
     def jugador_mover_izquierda_fin(self):
         self.mover_izquierda = False
 
-    # --- Actualización del estado (llamada cada frame por el Presenter) ---
+    # --- Consultas de combate (llamadas por la Vista al detectar colisiones) ---
 
-    def actualizar(self, plataformas, delta_time_ms):
-        """Actualiza física, IA y combate para todos los objetos del juego.
+    def golpe_jugador_a_enemigo(self, indice):
+        """La Vista notifica que la hitbox del jugador ha tocado al enemigo [indice]."""
+        if 0 <= indice < len(self.enemigos):
+            self.enemigos[indice].recibir_daño(1)
 
-        Parameters
-        ----------
-        plataformas : list of Plataforma
-            Lista de plataformas con su shape (viene de la Vista).
-        delta_time_ms : int
-            Milisegundos desde el último frame (para coyote time).
+    def golpe_enemigo_a_jugador(self):
+        """La Vista notifica que la hitbox de un enemigo ha tocado al jugador."""
+        self.jugador.recibir_daño(1)
+
+    def golpe_proyectil_a_jugador(self, proyectil):
+        """La Vista notifica que un proyectil ha tocado al jugador."""
+        self.jugador.recibir_daño(1.5)
+        proyectil.vivo = False
+
+    def golpe_jugador_a_proyectil(self, proyectil):
+        """La Vista notifica que la espada del jugador ha destruido un proyectil."""
+        proyectil.vivo = False
+
+    # --- Tick del Model (llamado por el Presenter cada frame) ---
+
+    def tick(self, delta_time_ms):
+        """Avanza los contadores internos del Model.
+
+        No mueve nada: la Vista ya ha movido y colisionado antes de llamar aquí.
 
         Returns
         -------
         list of int
-            Índices de los enemigos que han muerto este frame
-            (para que el Presenter elimine sus sprites de la Vista).
+            Índices de enemigos que han muerto este frame.
         """
-        # Calcular delta_x del jugador
-        delta_x = 0
         if self.mover_derecha:
-            delta_x = Constantes.VELOCIDAD
-        if self.mover_izquierda:
-            delta_x = -Constantes.VELOCIDAD
+            self.jugador.moviendose = True
+            self.jugador.flip       = False
+        elif self.mover_izquierda:
+            self.jugador.moviendose = True
+            self.jugador.flip       = True
+        else:
+            self.jugador.moviendose = False
 
-        # Actualizar jugador
-        self.jugador.actualizar(delta_x, plataformas, delta_time_ms)
+        self.jugador.tick(delta_time_ms)
 
-        # Actualizar enemigos
-        muertos = []
-        for i, enemigo in enumerate(self.enemigos):
-            enemigo.actualizar(plataformas, self.jugador, delta_time_ms)
-
-            # Golpe del jugador al enemigo
-            if (self.jugador.hitbox_ataque
-                    and self.jugador.hitbox_ataque.colliderect(enemigo.shape)
-                    and enemigo.vivo):
-                enemigo.recibir_daño(1)
-
-            # Golpe del enemigo al jugador (Enemigo_1)
-            if (enemigo.hitbox_ataque
-                    and enemigo.hitbox_ataque.colliderect(self.jugador.shape)):
-                self.jugador.recibir_daño(1)
-
-            # Proyectiles del Enemigo_2
-            if hasattr(enemigo, 'proyectiles'):
-                for p in enemigo.proyectiles:
-                    # Proyectil golpea al jugador
-                    if p.vivo and p.shape.colliderect(self.jugador.shape):
-                        self.jugador.recibir_daño(1.5)
-                        p.vivo = False
-                    # Jugador destruye el proyectil con espadazo
-                    if (p.vivo and self.jugador.hitbox_ataque
-                            and self.jugador.hitbox_ataque.colliderect(p.shape)):
-                        p.vivo = False
-
-            if not enemigo.vivo:
-                muertos.append(i)
-        # Eliminar muertos (en orden inverso para no alterar índices)
+        muertos = [i for i, e in enumerate(self.enemigos) if not e.vivo]
         for i in reversed(muertos):
             self.enemigos.pop(i)
 
         return muertos
 
-    # --- Exportar estado para la Vista ---
-
-    def obtener_estado_jugador(self):
-        """Devuelve el estado del jugador para sincronizar la Vista."""
-        return self.jugador.obtener_estado()
-
-    def obtener_estados_enemigos(self):
-        """Devuelve la lista de estados de todos los enemigos vivos."""
-        return [e.obtener_estado() for e in self.enemigos]
-
-    class ProyectilModel:
-        """Proyectil lanzado por el Enemigo_2."""
-
-        VELOCIDAD = 4
-
-        def __init__(self, x, y, flip):
-            self.shape = pygame.Rect(0, 0,
-                                     int(Constantes.WIDTH_PERSONAJE * 0.8),
-                                     int(Constantes.HEIGHT_PERSONAJE * 0.8))
-            self.shape.center = (x, y)
-            self.flip = flip  # True = va a la izquierda
-            self.vivo = True
-
-        def actualizar(self, plataformas):
-            if not self.vivo:
-                return
-            self.shape.x += -self.VELOCIDAD if self.flip else self.VELOCIDAD
-            for plat in plataformas:
-                if self.shape.colliderect(plat.shape):
-                    self.vivo = False
-                    return
-
-        def obtener_estado(self):
-            return {
-                'pos': self.shape.center,
-                'flip': self.flip,
-                'vivo': self.vivo,
-            }
-class ProyectilModel:
-    """Proyectil lanzado por el Enemigo_2, apunta hacia el jugador."""
-
-    VELOCIDAD = 4
-
-    def __init__(self, x, y, target_x, target_y):
-        self.shape = pygame.Rect(0, 0,
-            int(Constantes.WIDTH_PERSONAJE * 0.8),
-            int(Constantes.HEIGHT_PERSONAJE * 0.8))
-        self.shape.center = (x, y)
-
-        # Calcular dirección normalizada hacia el jugador
-        import math
-        dx = target_x - x
-        dy = target_y - y
-        dist = math.hypot(dx, dy) or 1
-        self.vel_x = (dx / dist) * self.VELOCIDAD
-        self.vel_y = (dy / dist) * self.VELOCIDAD
-
-        self.flip  = dx < 0    # True = va a la izquierda
-        self.vivo  = True
-        self._x    = float(x)
-        self._y    = float(y)
-
-    def actualizar(self, plataformas):
-        if not self.vivo:
-            return
-        self._x += self.vel_x
-        self._y += self.vel_y
-        self.shape.center = (int(self._x), int(self._y))
-        for plat in plataformas:
-            if self.shape.colliderect(plat.shape):
-                self.vivo = False
-                return
-
-    def obtener_estado(self):
-        return {
-            'pos':  self.shape.center,
-            'flip': self.flip,
-            'vivo': self.vivo,
-        }
+    @property
+    def delta_x_jugador(self):
+        """Desplazamiento horizontal del jugador para este frame."""
+        if self.mover_derecha:
+            return Constantes.VELOCIDAD
+        if self.mover_izquierda:
+            return -Constantes.VELOCIDAD
+        return 0

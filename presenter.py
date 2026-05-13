@@ -2,15 +2,15 @@
 
 El Presenter es el intermediario entre Model y View:
 1. Se suscribe a todos los eventos de la Vista (teclado, cierre)
-2. Llama al Model para actualizar el estado en respuesta a esos eventos
-3. Coordina el game loop: input → update → render → refrescar
+2. Llama al Model para registrar las intenciones del jugador
+3. Coordina el game loop: input → física → tick Model → render
 
 Flujo por frame en ejecutar():
 1. Vista procesa input → emite eventos → Presenter actualiza banderas en Model
-2. Model actualiza física, IA y combate
-3. Presenter elimina sprites de enemigos muertos de la Vista
-4. Vista renderiza usando el estado actual del Model
-5. Vista controla FPS y devuelve delta_time
+2. Vista ejecuta la física: mueve objetos, detecta colisiones, notifica al Model
+3. Model avanza sus contadores internos (iframes, fin de ataque, IA)
+4. Presenter elimina sprites de enemigos muertos de la Vista
+5. Vista renderiza usando el estado combinado Model + posiciones de la Vista
 """
 
 
@@ -26,25 +26,12 @@ class JuegoPresenter:
     ejecutando : bool
         Controla si el game loop sigue activo.
     _num_frames_ataque_jugador : int
-        Número de frames de la animación de ataque del jugador
-        (necesario para que el Model sepa cuándo termina el ataque).
+        Número de frames de la animación de ataque del jugador.
     """
 
     def __init__(self, vista, modelo, num_frames_ataque_jugador=4):
-        """Inicializa el Presenter y se suscribe a los eventos de la Vista.
-
-        Parameters
-        ----------
-        vista : PygameView
-            Instancia de la capa View.
-        modelo : JuegoModel
-            Instancia de la capa Model.
-        num_frames_ataque_jugador : int, optional
-            Número de frames de la animación de ataque del jugador.
-            Permite que el Model sepa cuándo termina el ataque sin conocer pygame.
-        """
-        self.vista    = vista
-        self.modelo   = modelo
+        self.vista      = vista
+        self.modelo     = modelo
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
 
@@ -69,15 +56,12 @@ class JuegoPresenter:
     # --- Handlers de eventos ---
 
     def _cerrar(self):
-        """Detiene el game loop."""
         self.ejecutando = False
 
     def _saltar(self):
-        """Delega el salto al Model."""
         self.modelo.jugador_saltar()
 
     def _atacar(self):
-        """Delega el ataque al Model, informando cuántos frames dura la animación."""
         self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
 
     # --- Game loop ---
@@ -86,37 +70,35 @@ class JuegoPresenter:
         """Bucle principal del juego.
 
         Secuencia por frame:
-        1. Vista procesa input y emite eventos → handlers actualizan el Model
-        2. Model actualiza física, IA y combate → devuelve lista de muertos
-        3. Presenter sincroniza sprites de la Vista (elimina los de enemigos muertos)
-        4. Vista renderiza usando el estado exportado por el Model
-        5. Vista controla FPS y devuelve delta_time
-
-        Returns
-        -------
-        None
-            Itera hasta que `self.ejecutando` sea False.
+        1. Vista procesa input → eventos → handlers actualizan el Model
+        2. Vista ejecuta la física y notifica al Model sobre colisiones
+        3. Model avanza iframes, animación de ataque e IA
+        4. Presenter elimina sprites de enemigos muertos
+        5. Vista renderiza usando el estado exportado por Model y Vista
         """
-        import pygame  # Solo para pygame.quit() al final
+        import pygame
 
         while self.ejecutando:
-            # 1. Input → eventos → handlers
+            # 1. Input
             self.vista.procesar_input()
-            if self.modelo.jugador.vivo:
-                # 2. Actualizar Model (física + IA + combate)
-                #    Recibe delta_time del frame anterior para coyote time
-                delta_time = self.vista.refrescar()
-                muertos = self.modelo.actualizar(self.vista.plataformas, delta_time)
 
-                # 3. Eliminar sprites de enemigos muertos de la Vista
-                #    Se procesan en orden inverso para no alterar índices
+            if self.modelo.jugador.vivo:
+                # 2. Delta time del frame anterior
+                delta_time = self.vista.refrescar()
+
+                # 3. Vista: mover objetos + detectar colisiones + notificar Model
+                self.vista.actualizar_fisica(self.modelo, delta_time)
+
+                # 4. Model: avanzar contadores internos (iframes, ataques, IA)
+                muertos = self.modelo.tick(delta_time)
+
+                # 5. Eliminar sprites de enemigos muertos
                 for i in reversed(muertos):
                     self.vista.eliminar_sprite_enemigo(i)
 
-            # 4. Renderizar: la Vista sincroniza sus sprites con el estado del Model
-            self.vista.renderizar(
-                self.modelo.obtener_estado_jugador(),
-                self.modelo.obtener_estados_enemigos(),
-            )
+            # 6. Renderizar
+            estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
+            estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
+            self.vista.renderizar(estado_jugador, estados_enemigos)
 
         pygame.quit()
