@@ -12,6 +12,7 @@ Flujo por frame en ejecutar():
 4. Vista renderiza usando el estado actual del Model
 5. Vista controla FPS y devuelve delta_time
 """
+from SaveSystem import SaveManager
 
 
 class JuegoPresenter:
@@ -48,6 +49,8 @@ class JuegoPresenter:
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
 
+        self.save_manager = SaveManager() # Gestor de guardado
+
         # --- Suscripción a eventos de la Vista ---
         self.vista.evt_cerrar.add_listener(self._cerrar)
 
@@ -66,6 +69,9 @@ class JuegoPresenter:
         self.vista.evt_saltar.add_listener(self._saltar)
         self.vista.evt_atacar.add_listener(self._atacar)
 
+        self.vista.evt_guardar.add_listener(self._guardar_partida)
+        self.vista.evt_cargar.add_listener(self._cargar_partida)
+
     # --- Handlers de eventos ---
 
     def _cerrar(self):
@@ -79,6 +85,45 @@ class JuegoPresenter:
     def _atacar(self):
         """Delega el ataque al Model, informando cuántos frames dura la animación."""
         self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
+
+    def _guardar_partida(self):
+        """Guarda el estado actual del juego en un archivo."""
+        try:
+            # Obtener estado del Model
+            estado = self.modelo.obtener_estado_guardado()
+
+            # Añadir posición de la cámara desde la Vista
+            estado['camara'] = self.vista.camara_pos
+
+            # Guardar a disco usando SaveManager
+            if self.save_manager.guardar(estado):
+                print("[Presenter] ✓ Partida guardada exitosamente")
+                self.vista.sprite_checkpoint.activado = True
+            else:
+                print("[Presenter] ✗ Error al guardar la partida")
+        except Exception as e:
+            print(f"[Presenter] ✗ Excepción al guardar: {e}")
+
+    def _cargar_partida(self):
+        """Carga el estado guardado del juego (F10)."""
+        try:
+            # Intentar cargar usando SaveManager
+            datos = self.save_manager.cargar()
+            if datos is None:
+                print("[Presenter] No hay partida guardada aún")
+                return
+
+            # Restaurar estado del Model
+            self.modelo.cargar_estado_guardado(datos)
+
+            # Restaurar cámara en la Vista
+            if 'camara' in datos:
+                cx, cy = datos['camara']
+                self.vista.restaurar_camara(cx, cy)
+
+            print("[Presenter] ✓ Partida cargada exitosamente")
+        except Exception as e:
+            print(f"[Presenter] ✗ Excepción al cargar: {e}")
 
     # --- Game loop ---
 

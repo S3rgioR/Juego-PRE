@@ -27,7 +27,9 @@ from .Camara import Camara
 from .Personaje import PersonajeSprite
 from .Enemigo_1 import Enemigo1Sprite
 from .Plataforma import Plataforma
+from .CheckPoint import CheckpointView
 
+from Nivel import CHECKPOINT_NIVEL_1
 
 class PygameView:
     """Gestiona entrada, cámara, sprites y renderizado del juego.
@@ -111,6 +113,7 @@ class PygameView:
             Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack'])
             for d in datos_enemigos
         ]
+        self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
 
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
@@ -120,6 +123,8 @@ class PygameView:
         self.evt_mover_izquierda_fin    = Event()
         self.evt_saltar                 = Event()
         self.evt_atacar                 = Event()
+        self.evt_guardar = Event()
+        self.evt_cargar = Event()
 
     # ------------------------------------------------------------------
     # Acceso a datos que el Model/Presenter necesitan
@@ -151,6 +156,11 @@ class PygameView:
                     self.evt_saltar.emit()
                 elif event.key == pygame.K_j:
                     self.evt_atacar.emit()
+                elif event.key == pygame.K_k:
+                    if self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
+                        self.evt_guardar.emit()
+                elif event.key == pygame.K_F10:
+                    self.evt_cargar.emit()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -179,6 +189,8 @@ class PygameView:
         # 2. Fondos estáticos
         self.screen.blit(self.fondo, (0, 0))
         self.screen.blit(self.fondo_walls, (0, 0))
+
+        self.sprite_checkpoint.draw(self.screen, self.camara)
 
         # 3. Plataformas
         for plat in self.sprites_plataformas:
@@ -237,3 +249,11 @@ class PygameView:
             x = (Constantes.WIDTH - texto_go.get_width()) // 2
             y = (Constantes.HEIGHT - texto_go.get_height()) // 2
             self.screen.blit(texto_go, (x, y))
+
+    @property
+    def camara_pos(self):
+        return [self.camara.x, self.camara.y]
+
+    def restaurar_camara(self, cx, cy):
+        self.camara.x = cx
+        self.camara.y = cy
