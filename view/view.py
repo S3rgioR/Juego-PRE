@@ -261,7 +261,7 @@ class PygameView:
     # --- Movimiento de enemigos ---
 
     def _mover_enemigos(self, modelo, delta_time_ms):
-        from model import Enemigo1Model
+        from model.Enemigo1Model import Enemigo1Model
         pos_jugador = self.sprite_jugador.shape.center
 
         for i, (sprite, enemigo_m) in enumerate(
