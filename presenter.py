@@ -98,7 +98,7 @@ class JuegoPresenter:
             # Guardar a disco usando SaveManager
             if self.save_manager.guardar(estado):
                 print("[Presenter] ✓ Partida guardada exitosamente")
-                self.vista.sprite_checkpoint.activado = True
+                self.vista.sprite_checkpoint.activar()
             else:
                 print("[Presenter] ✗ Error al guardar la partida")
         except Exception as e:

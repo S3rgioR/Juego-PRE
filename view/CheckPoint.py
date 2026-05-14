@@ -5,7 +5,7 @@ el punto de guardado. Sin lógica compleja.
 """
 
 import pygame
-
+import numpy
 
 class CheckpointView:
     """Vista visual del checkpoint como cuadrado simple.
@@ -32,9 +32,13 @@ class CheckpointView:
         x, y : int
             Centro del checkpoint en coordenadas de mundo.
         """
-        self.shape = pygame.Rect(0, 0, self.TAMAÑO, self.TAMAÑO)
+        self.image = pygame.image.load("Enviorments/statue.png").convert_alpha()
+        self.shape = pygame.Rect(0, 0, self.image.get_width(), self.image.get_height())
         self.shape.center = (x, y)
         self.activado = False
+        self._timer_azul = 0  # ms que queda el efecto azul activo
+        self._DURACION_AZUL = 1500  # duración del destello en ms
+
 
     def esta_cerca(self, jugador_shape: pygame.Rect, radio: int = 80) -> bool:
         """Devuelve True si el jugador está dentro del radio de activación.
@@ -56,24 +60,29 @@ class CheckpointView:
         distancia_cuadrado = dx * dx + dy * dy
         return distancia_cuadrado <= radio * radio
 
-    def draw(self, interfaz: pygame.Surface, camara) -> None:
-        """Dibuja el checkpoint como un cuadrado en la pantalla.
+    def draw(self, interfaz, camara):
+        img_rect = self.image.get_rect(midbottom=self.shape.midbottom)
 
-        Parameters
-        ----------
-        interfaz : pygame.Surface
-            Superficie principal de la ventana.
-        camara : Camara
-            Instancia de cámara para transformar coordenadas.
-        """
-        # Obtener posición en pantalla
-        rect_pantalla = camara.aplicar(self.shape)
+        tiempo_actual = pygame.time.get_ticks()
 
-        # Elegir color según estado
-        color = self.COLOR_ACTIVADO if self.activado else self.COLOR_INACTIVO
+        if self._timer_azul > 0:
+            ms_transcurridos = tiempo_actual - self._inicio_azul
+            if ms_transcurridos < self._DURACION_AZUL:
+                imagen_azul = self.image.convert_alpha()
+                arr = pygame.surfarray.pixels3d(imagen_azul)
+                alpha = pygame.surfarray.pixels_alpha(imagen_azul)
+                mask = alpha > 0
+                arr[:, :, 0][mask] = arr[:, :, 0][mask] // 2
+                arr[:, :, 1][mask] = arr[:, :, 1][mask] // 2
+                arr[:, :, 2][mask] = numpy.minimum(255, arr[:, :, 2][mask].astype(int) + 150)
+                del arr, alpha
+                interfaz.blit(imagen_azul, camara.aplicar(img_rect))
+            else:
+                self._timer_azul = 0
+                interfaz.blit(self.image, camara.aplicar(img_rect))
+        else:
+            interfaz.blit(self.image, camara.aplicar(img_rect))
 
-        # Dibujar cuadrado relleno
-        pygame.draw.rect(interfaz, color, rect_pantalla)
-
-        # Dibujar borde
-        pygame.draw.rect(interfaz, self.COLOR_BORDE, rect_pantalla, self.GROSOR_BORDE)
+    def activar(self):
+        self._timer_azul = self._DURACION_AZUL
+        self._inicio_azul = pygame.time.get_ticks()
