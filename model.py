@@ -20,12 +20,24 @@ usa para sincronizar sus sprites.
 import pygame
 import Constantes
 
+class Persona:
+
+    def recibir_daño(self, daño):
+        """Reduce hp. Ignora el golpe si hay iframes activos."""
+        if not self.vivo or self.iframe_timer > 0:
+            return
+        self.hp -= daño
+        self.iframe_timer = self.iframe_duracion
+        if self.hp <= 0:
+            self.hp = 0
+            self.vivo = False
+    ## REsto de funcione...
 
 # ---------------------------------------------------------------------------
 # Sub-modelo: Jugador
 # ---------------------------------------------------------------------------
 
-class JugadorModel:
+class JugadorModel(Persona):
     """Estado y física del jugador.
 
     Attributes
@@ -109,15 +121,6 @@ class JugadorModel:
             self.velocidad_y  = Constantes.FUERZA_SALTO
             self.en_suelo     = False
             self.coyote_timer = 0
-
-    def recibir_daño(self, daño):
-        if not self.vivo or self.iframe_timer > 0:  # ← ignorar si hay iframes
-            return
-        self.hp -= daño
-        self.iframe_timer = self.iframe_duracion  # ← activar invencibilidad
-        if self.hp <= 0:
-            self.hp = 0
-            self.vivo = False
 
     # --- Física (llamada cada frame por el Model principal) ---
 
@@ -254,7 +257,7 @@ class JugadorModel:
 # Sub-modelo: Enemigo_1
 # ---------------------------------------------------------------------------
 
-class Enemigo1Model:
+class Enemigo1Model(Persona):
     """Estado y física del primer tipo de enemigo.
 
     Attributes
@@ -329,16 +332,6 @@ class Enemigo1Model:
 
         self.iframe_duracion = 600  # ms de invencibilidad tras recibir golpe
         self.iframe_timer = 0  # ms restantes de invencibilidad
-
-    def recibir_daño(self, daño):
-        """Reduce hp. Ignora el golpe si hay iframes activos."""
-        if not self.vivo or self.iframe_timer > 0:
-            return
-        self.hp -= daño
-        self.iframe_timer = self.iframe_duracion
-        if self.hp <= 0:
-            self.hp = 0
-            self.vivo = False
 
     def actualizar(self, plataformas, jugador_model, delta_time_ms=16):
         """Actualiza el estado del enemigo para este frame."""
@@ -576,3 +569,23 @@ class JuegoModel:
     def obtener_estados_enemigos(self):
         """Devuelve la lista de estados de todos los enemigos vivos."""
         return [e.obtener_estado() for e in self.enemigos]
+    #  --- Guardar partida ---
+    def obtener_estado_guardado(self):
+        return {
+            'pos': list(self.jugador.shape.center),
+            'hp': self.jugador.hp,
+            'num_enemigos_vivos': len(self.enemigos),
+        }
+
+    def cargar_estado_guardado(self, datos):
+        if 'pos' in datos:
+            x, y = datos['pos']
+            self.jugador.shape.center = (int(x), int(y))
+            self.jugador._y = float(self.jugador.shape.y)
+        if 'hp' in datos:
+            self.jugador.hp = max(1, int(datos['hp']))
+            self.jugador.vivo = self.jugador.hp > 0
+        self.jugador.velocidad_y = 0
+        self.jugador.atacando = False
+        self.jugador.hitbox_ataque = None
+        self.jugador.iframe_timer = 0

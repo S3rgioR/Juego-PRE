@@ -11,7 +11,7 @@ como la Vista (para dibujar), y el Presenter lo pasa a ambos.
 import pygame
 from view.Plataforma import Plataforma
 
-
+CHECKPOINT_NIVEL_1 = (500, 620)
 def cargar_nivel_1(tileset):
     """Construye y devuelve la lista de plataformas del nivel 1.
 
@@ -25,6 +25,7 @@ def cargar_nivel_1(tileset):
     list of Plataforma
         Lista ordenada de plataformas que forman el nivel.
     """
+
     plataformas = []
 
     # --- Definición de tiles dentro del tileset ---

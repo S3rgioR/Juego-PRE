@@ -6,9 +6,10 @@ No contiene física ni lógica de juego — eso vive en el Model.
 """
 
 import pygame
+from pygame.sprite import Sprite
 
 
-class Plataforma:
+class Plataforma(Sprite):
     """Sprite visual de una plataforma con textura de tile repetido.
 
     Attributes

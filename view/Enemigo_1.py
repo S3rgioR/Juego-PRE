@@ -6,10 +6,12 @@ Recibe el estado lógico del Model cada frame a través de `sincronizar()`.
 """
 
 import pygame
+from pygame.sprite import Sprite
+
 import Constantes
 import numpy
 
-class Enemigo1Sprite:
+class Enemigo1Sprite(Sprite):
     """Sprite visual del primer tipo de enemigo.
 
     El sprite sincroniza su posición y estado con el Model en cada frame.
