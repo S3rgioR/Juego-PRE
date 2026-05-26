@@ -40,6 +40,8 @@ from .Personaje import PersonajeSprite
 from .Enemigo_1 import Enemigo1Sprite
 from .Enemigo_2 import Enemigo2Sprite
 from .Plataforma import Plataforma
+from .CheckpointView import CheckpointView
+from Nivel import CHECKPOINT_NIVEL_1
 
 
 class PygameView:
@@ -138,6 +140,11 @@ class PygameView:
         self.evt_mover_izquierda_fin    = Event()
         self.evt_saltar                 = Event()
         self.evt_atacar                 = Event()
+        self.evt_guardar                = Event()   # K cerca del checkpoint
+        self.evt_cargar                 = Event()   # F10
+
+        # --- Checkpoint ---
+        self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
 
     # ------------------------------------------------------------------
     # Acceso a datos compartidos con el Presenter
@@ -147,6 +154,30 @@ class PygameView:
     def plataformas(self):
         """Expone la lista de Plataforma al Presenter."""
         return self.sprites_plataformas
+
+    @property
+    def camara_pos(self):
+        """Devuelve la posición de la cámara como lista serializable."""
+        return [self.camara.x, self.camara.y]
+
+    def restaurar_camara(self, cx, cy):
+        """Restaura la posición de la cámara al cargar una partida."""
+        self.camara.x = cx
+        self.camara.y = cy
+
+    def restaurar_pos_jugador(self, x, y):
+        """Restaura la posición física del sprite del jugador.
+
+        En esta arquitectura las posiciones viven en la Vista,
+        por eso la restauración también debe hacerse aquí.
+
+        Parameters
+        ----------
+        x, y : int
+            Centro del jugador en coordenadas de mundo.
+        """
+        self.sprite_jugador.shape.center = (x, y)
+        self.sprite_jugador._hitbox_ataque_cache = None
 
     # ------------------------------------------------------------------
     # Input
@@ -169,6 +200,11 @@ class PygameView:
                     self.evt_saltar.emit()
                 elif event.key == pygame.K_j:
                     self.evt_atacar.emit()
+                elif event.key == pygame.K_k:
+                    if self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
+                        self.evt_guardar.emit()
+                elif event.key == pygame.K_F10:
+                    self.evt_cargar.emit()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -410,7 +446,12 @@ class PygameView:
         for plat in self.sprites_plataformas:
             plat.draw(self.screen, self.camara)
 
-        # 4. Enemigos
+        # 4. Checkpoint
+        cerca = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
+        self.sprite_checkpoint.set_mostrar_prompt(cerca)
+        self.sprite_checkpoint.draw(self.screen, self.camara)
+
+        # 5. Enemigos
         for sprite, estado in zip(self.sprites_enemigos, estados_enemigos):
             sprite.sincronizar(estado)
             sprite.draw(self.screen, self.camara, estado)

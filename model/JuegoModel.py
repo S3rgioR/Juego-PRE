@@ -129,3 +129,42 @@ class JuegoModel:
         if self.mover_izquierda:
             return -Constantes.VELOCIDAD
         return 0
+
+    # --- Guardado / Carga de partida ---
+
+    def obtener_estado_guardado(self):
+        """Devuelve un dict serializable con el estado a persistir.
+
+        La posición NO se incluye aquí: la Vista la añade antes de guardar,
+        ya que en esta arquitectura las posiciones viven en la Vista.
+
+        Returns
+        -------
+        dict
+            Claves: 'hp' (int), 'num_enemigos_vivos' (int).
+        """
+        return {
+            'hp': self.jugador.hp,
+            'num_enemigos_vivos': len(self.enemigos),
+        }
+
+    def cargar_estado_guardado(self, datos):
+        """Restaura el estado lógico del jugador desde un dict cargado de disco.
+
+        Solo restaura hp y flags lógicos. La posición la restaura la Vista
+        directamente sobre el shape del sprite.
+
+        Parameters
+        ----------
+        datos : dict
+            Dict con las mismas claves que devuelve obtener_estado_guardado().
+        """
+        if 'hp' in datos:
+            self.jugador.hp   = max(1, int(datos['hp']))
+            self.jugador.vivo = self.jugador.hp > 0
+
+        # Reiniciar velocidades y estado de ataque para evitar artefactos
+        self.jugador.velocidad_y  = 0
+        self.jugador.atacando     = False
+        self.jugador.iframe_timer = 0
+        self.jugador.coyote_timer = 0
