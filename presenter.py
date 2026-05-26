@@ -13,6 +13,8 @@ Flujo por frame en ejecutar():
 5. Vista renderiza usando el estado combinado Model + posiciones de la Vista
 """
 
+from SaveManager import SaveManager
+
 
 class JuegoPresenter:
     """Coordinador central que conecta Model y View.
@@ -34,6 +36,7 @@ class JuegoPresenter:
         self.modelo     = modelo
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
+        self.save_manager = SaveManager()
 
         # --- Suscripción a eventos de la Vista ---
         self.vista.evt_cerrar.add_listener(self._cerrar)
@@ -52,6 +55,8 @@ class JuegoPresenter:
         )
         self.vista.evt_saltar.add_listener(self._saltar)
         self.vista.evt_atacar.add_listener(self._atacar)
+        self.vista.evt_guardar.add_listener(self._guardar_partida)
+        self.vista.evt_cargar.add_listener(self._cargar_partida)
 
     # --- Handlers de eventos ---
 
@@ -63,6 +68,39 @@ class JuegoPresenter:
 
     def _atacar(self):
         self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
+
+    def _guardar_partida(self):
+        """Guarda posición (de la Vista), hp (del Model) y cámara."""
+        try:
+            estado = self.modelo.obtener_estado_guardado()
+            # La posición vive en la Vista en esta arquitectura
+            estado['pos']    = list(self.vista.sprite_jugador.shape.center)
+            estado['camara'] = self.vista.camara_pos
+            if self.save_manager.guardar(estado):
+                print("[Presenter] ✓ Partida guardada")
+                self.vista.sprite_checkpoint.activar()
+        except Exception as e:
+            print(f"[Presenter] ✗ Error al guardar: {e}")
+
+    def _cargar_partida(self):
+        """Carga y restaura posición (en Vista), hp (en Model) y cámara."""
+        try:
+            datos = self.save_manager.cargar()
+            if datos is None:
+                print("[Presenter] No hay partida guardada")
+                return
+            # Restaurar lógica en el Model
+            self.modelo.cargar_estado_guardado(datos)
+            # Restaurar posición en la Vista (aquí viven las posiciones)
+            if 'pos' in datos:
+                x, y = datos['pos']
+                self.vista.restaurar_pos_jugador(int(x), int(y))
+            if 'camara' in datos:
+                self.vista.restaurar_camara(*datos['camara'])
+            self.vista.sprite_checkpoint.activado = True
+            print("[Presenter] ✓ Partida cargada")
+        except Exception as e:
+            print(f"[Presenter] ✗ Error al cargar: {e}")
 
     # --- Game loop ---
 

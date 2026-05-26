@@ -8,6 +8,9 @@ Vive fuera de view/ porque lo necesitan tanto el Model (para colisiones)
 como la Vista (para dibujar), y el Presenter lo pasa a ambos.
 """
 
+# Posición del checkpoint en el nivel 1 (centro, coordenadas de mundo).
+CHECKPOINT_NIVEL_1 = (500, 620)
+
 import pygame
 from view.Plataforma import Plataforma
 
