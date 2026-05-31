@@ -1,10 +1,12 @@
 """Punto de entrada del juego - Composición explícita del patrón MVP.
 
 Responsabilidades de este módulo:
-1. Cargar todos los assets (imágenes, animaciones)
-2. Crear las tres capas del patrón MVP: Model, View, Presenter
-3. Conectar las capas entre sí
-4. Iniciar el game loop
+1. Inicializar pygame y abrir la ventana
+2. Mostrar el menú principal
+3. Cargar todos los assets (imágenes, animaciones)
+4. Crear las tres capas del patrón MVP: Model, View, Presenter
+5. Conectar las capas entre sí
+6. Iniciar el game loop
 
 Arquitectura MVP (física en la Vista):
 - Model   : reglas de juego, IA, combate, hp. Sin pygame gráfico ni posiciones.
@@ -14,21 +16,24 @@ Arquitectura MVP (física en la Vista):
              coordina el loop.
 
 Orden de inicialización:
-1. pygame.init()
-2. Calcular constantes de tamaño del personaje (requiere image.load, NO convert)
-3. Cargar frames de animación (image.load + scale, NO convert_alpha aún)
-4. Crear Model (no necesita pygame.display)
-5. Crear View → aquí se llama pygame.display.set_mode() y después se puede
-   usar convert_alpha(). El tileset y los fondos se cargan dentro de View.__init__.
-6. Crear Presenter y arrancar el loop.
+1. pygame.init() + pygame.display.set_mode()   ← necesario para el menú
+2. Mostrar menú principal (bloquea hasta elección del usuario)
+3. Calcular constantes de tamaño del personaje (requiere image.load)
+4. Cargar frames de animación
+5. Crear Model
+6. Crear View  ← reutiliza la ventana ya abierta
+7. Crear Presenter y arrancar el loop
 """
 
+import sys
 import pygame
 import Constantes
-from model    import JuegoModel
-from view     import PygameView
+from model     import JuegoModel
+from view      import PygameView
 from presenter import JuegoPresenter
-from Nivel    import cargar_nivel_1
+from Nivel     import cargar_nivel_1
+from SaveManager   import SaveManager
+from MenuPrincipal import MenuPrincipal
 
 
 def escalar_img(image, scale):
@@ -47,15 +52,17 @@ def cargar_frames(patron, n, scale):
     return frames
 
 
-def main():
-    """Carga assets, compone las capas MVP e inicia el game loop."""
+def iniciar_partida(cargar_save: bool = False):
+    """Carga assets, compone las capas MVP e inicia el game loop.
 
-    pygame.init()
-
+    Parameters
+    ----------
+    cargar_save : bool
+        Si True, el Presenter cargará la partida guardada justo al arrancar.
+    """
     s = Constantes.SCALA_PERSONAJE
 
-    # Calcular dimensiones del personaje antes de crear la ventana.
-    # image.load sin convert_alpha() es seguro antes de set_mode().
+    # Calcular dimensiones del personaje.
     _img_ref = pygame.image.load(
         "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png"
     )
@@ -84,9 +91,6 @@ def main():
     anim_volador_walk = cargar_frames(
         "Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
 
-    # --- Datos de enemigos ---
-    # 'x', 'y' y 'distancia_patrulla' los usa el Model para fijar la IA.
-    # 'anim_walk' y 'anim_attack' los usa la Vista para crear los sprites.
     datos_enemigos = [
         {
             'tipo': 'terrestre',
@@ -116,22 +120,61 @@ def main():
     # Composición MVP
     # ---------------------------------------------------------------------------
 
-    # 1. Model: reglas de juego. Solo necesita datos escalares de cada enemigo.
     modelo = JuegoModel(datos_enemigos)
 
-    # 2. View: física, sprites, cámara.
     vista = PygameView(
         frames_jugador=frames_jugador,
         datos_enemigos=datos_enemigos,
         nivel_loader=cargar_nivel_1,
     )
 
-    # 3. Presenter: conecta Model y View, gestiona el game loop.
     num_frames_ataque = len(frames_jugador['AtaqueParado'])
     presenter = JuegoPresenter(vista, modelo, num_frames_ataque_jugador=num_frames_ataque)
 
-    # 4. Iniciar el game loop
+    # Si venimos de «Cargar partida», disparar la carga antes de arrancar
+    if cargar_save:
+        presenter._cargar_partida()
+
     presenter.ejecutar()
+
+
+def main():
+    """Inicializa pygame, muestra el menú y lanza la acción elegida."""
+
+    pygame.init()
+
+    # Abrir la ventana una sola vez; tanto el menú como el juego la reutilizan
+    pygame.display.set_mode((Constantes.WIDTH, Constantes.HEIGHT), pygame.DOUBLEBUF)
+    pygame.display.set_caption("Cavern Quest")
+
+    save_manager = SaveManager()
+
+    while True:
+        # ── Menú principal ──────────────────────────────────────────────────
+        menu   = MenuPrincipal(
+            screen     = pygame.display.get_surface(),
+            tiene_save = save_manager.existe(),
+        )
+        accion = menu.ejecutar()
+
+        # ── Despachar acción ────────────────────────────────────────────────
+        if accion == 'salir':
+            break
+
+        elif accion == 'config':
+            # Reservado para una futura pantalla de configuración
+            pass
+
+        elif accion == 'jugar':
+            iniciar_partida(cargar_save=False)
+
+        elif accion == 'cargar':
+            iniciar_partida(cargar_save=True)
+
+        # Tras terminar una partida el bucle vuelve al menú automáticamente
+
+    pygame.quit()
+    sys.exit()
 
 
 if __name__ == "__main__":
