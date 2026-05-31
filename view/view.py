@@ -72,13 +72,8 @@ class PygameView:
     """
 
     def __init__(self, frames_jugador, datos_enemigos, nivel_loader):
-        """Inicializa pygame, la ventana, los fondos, los sprites y los eventos."""
-        pygame.init()
-
-        self.screen = pygame.display.set_mode(
-            (Constantes.WIDTH, Constantes.HEIGHT),
-            pygame.DOUBLEBUF
-        )
+        """Inicializa fondos, sprites y eventos. pygame ya lo inicializa main()."""
+        self.screen = pygame.display.get_surface()
         pygame.display.set_caption("Juego de Plataformas - MVP")
 
         self.reloj  = pygame.time.Clock()
@@ -142,6 +137,7 @@ class PygameView:
         self.evt_atacar                 = Event()
         self.evt_guardar                = Event()   # K cerca del checkpoint
         self.evt_cargar                 = Event()   # F10
+        self.evt_pausa                  = Event()   # ESC → abre/cierra pausa
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
@@ -183,15 +179,15 @@ class PygameView:
     # Input
     # ------------------------------------------------------------------
 
-    def procesar_input(self):
-        """Captura eventos pygame y emite los eventos MVP correspondientes."""
-        for event in pygame.event.get():
+    def procesar_input(self, events):
+        """Procesa la lista de eventos pygame y emite los eventos MVP correspondientes."""
+        for event in events:
             if event.type == pygame.QUIT:
                 self.evt_cerrar.emit()
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.evt_cerrar.emit()
+                    self.evt_pausa.emit()
                 elif event.key == pygame.K_d:
                     self.evt_mover_derecha_inicio.emit()
                 elif event.key == pygame.K_a:

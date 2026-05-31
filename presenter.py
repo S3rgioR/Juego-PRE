@@ -14,6 +14,7 @@ Flujo por frame en ejecutar():
 """
 
 from SaveManager import SaveManager
+from MenuPausa   import MenuPausa
 
 
 class JuegoPresenter:
@@ -37,9 +38,13 @@ class JuegoPresenter:
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
         self.save_manager = SaveManager()
+        self._pausado     = False
+        self._menu_pausa  = None   # se crea al pausar (así tiene el save actualizado)
+        self.salida_forzada = False  # True si el usuario cerró la ventana con la X
 
         # --- Suscripción a eventos de la Vista ---
         self.vista.evt_cerrar.add_listener(self._cerrar)
+        self.vista.evt_pausa.add_listener(self._togglear_pausa)
 
         self.vista.evt_mover_derecha_inicio.add_listener(
             self.modelo.jugador_mover_derecha_inicio
@@ -61,7 +66,51 @@ class JuegoPresenter:
     # --- Handlers de eventos ---
 
     def _cerrar(self):
-        self.ejecutando = False
+        self.ejecutando  = False
+        self.salida_forzada = True
+
+    def _togglear_pausa(self):
+        self._pausado = not self._pausado
+        if self._pausado:
+            self._menu_pausa = MenuPausa(
+                screen     = self.vista.screen,
+                tiene_save = self.save_manager.existe(),
+            )
+
+    def _procesar_pausa(self, events):
+        """Dibuja el menú de pausa y procesa sus eventos. Llamado cada frame pausado."""
+        import pygame
+        mouse_pos = pygame.mouse.get_pos()
+        hover     = self._menu_pausa.hover_idx(mouse_pos)
+
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.ejecutando  = False
+                self._pausado    = False
+                self.salida_forzada = True
+                return
+
+            accion = self._menu_pausa.procesar_evento(event)
+            if accion is None:
+                continue
+
+            if accion == 'reanudar':
+                self._pausado = False
+
+            elif accion == 'cargar':
+                self._cargar_partida()
+                self._pausado = False
+
+            elif accion == 'config':
+                pass   # reservado
+
+            elif accion == 'menu_principal':
+                self.ejecutando = False
+                self._pausado   = False
+
+        # Dibuja el panel encima del frame congelado y presenta
+        self._menu_pausa.dibujar(hover)
+        pygame.display.flip()
 
     def _saltar(self):
         self.modelo.jugador_saltar()
@@ -116,18 +165,30 @@ class JuegoPresenter:
         """
         import pygame
 
+        reloj = pygame.time.Clock()
+
         while self.ejecutando:
-            # 1. Input
-            self.vista.procesar_input()
+            # Capturar todos los eventos del frame una sola vez
+            events = pygame.event.get()
+
+            if self._pausado:
+                # ── Juego congelado: solo procesar el menú de pausa ──────────
+                reloj.tick(60)
+                self._procesar_pausa(events)
+                continue
+
+            # ── Juego activo ─────────────────────────────────────────────────
+            # 1. Input: pasar eventos a la Vista para que emita sus eventos MVP
+            self.vista.procesar_input(events)
 
             if self.modelo.jugador.vivo:
-                # 2. Delta time del frame anterior
+                # 2. Delta time
                 delta_time = self.vista.refrescar()
 
                 # 3. Vista: mover objetos + detectar colisiones + notificar Model
                 self.vista.actualizar_fisica(self.modelo, delta_time)
 
-                # 4. Model: avanzar contadores internos (iframes, ataques, IA)
+                # 4. Model: avanzar contadores internos
                 muertos = self.modelo.tick(delta_time)
 
                 # 5. Eliminar sprites de enemigos muertos
@@ -138,3 +199,4 @@ class JuegoPresenter:
             estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
             estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
             self.vista.renderizar(estado_jugador, estados_enemigos)
+
