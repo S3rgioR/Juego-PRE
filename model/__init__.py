@@ -8,5 +8,5 @@ Exporta JuegoModel como punto de acceso principal.
 """
 
 from .JuegoModel import JuegoModel
-
-__all__ = ['JuegoModel']
+from .BossModel import BossModel
+__all__ = ['JuegoModel', 'BossModel']

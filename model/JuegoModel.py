@@ -8,6 +8,7 @@ import Constantes
 from .JugadorModel  import JugadorModel
 from .Enemigo1Model import Enemigo1Model
 from .Enemigo2Model import Enemigo2Model
+from .BossModel import BossModel
 
 
 class JuegoModel:
@@ -28,10 +29,13 @@ class JuegoModel:
         True mientras la tecla A está pulsada.
     """
 
-    def __init__(self, datos_enemigos):
+    def __init__(self, datos_enemigos, datos_boss):
         self.jugador = JugadorModel()
 
         self.enemigos = []
+        self.boss = None
+        if datos_boss:
+            self.boss = BossModel(datos_boss['x'], datos_boss['y'])
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
                 self.enemigos.append(
@@ -51,6 +55,10 @@ class JuegoModel:
 
         self.mover_derecha   = False
         self.mover_izquierda = False
+
+        # Usados por tick() para comunicar deltas al boss y recibir pos del jugador
+        self.boss_delta        = (0.0, 0.0)
+        self.jugador_pos_cache = (0, 0)
 
     # --- Acciones del jugador (delegadas desde el Presenter) ---
 
@@ -92,6 +100,17 @@ class JuegoModel:
         """La Vista notifica que la espada del jugador ha destruido un proyectil."""
         proyectil.vivo = False
 
+    def golpe_jugador_a_boss(self):
+        if self.boss:
+            self.boss.recibir_daño(1)
+
+    def golpe_boss_a_jugador(self):
+        self.jugador.recibir_daño(1.5)
+
+    def golpe_proyectil_boss_a_jugador(self, proyectil):
+        self.jugador.recibir_daño(proyectil.daño)
+        proyectil.vivo = False
+
     # --- Tick del Model (llamado por el Presenter cada frame) ---
 
     def tick(self, delta_time_ms):
@@ -114,6 +133,11 @@ class JuegoModel:
             self.jugador.moviendose = False
 
         self.jugador.tick(delta_time_ms)
+
+        # tick_ia del boss se llama en la Vista (actualizar_fisica) para
+        # que el delta se aplique en el mismo frame. Aquí solo avanzamos iframes.
+        if self.boss and self.boss.vivo:
+            self.boss._tick_iframes(delta_time_ms)
 
         muertos = [i for i, e in enumerate(self.enemigos) if not e.vivo]
         for i in reversed(muertos):

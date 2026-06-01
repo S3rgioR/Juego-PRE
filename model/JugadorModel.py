@@ -9,6 +9,7 @@ import Constantes
 from .Actor import Actor
 
 
+
 class JugadorModel(Actor):
     """Estado lógico del jugador.
 
