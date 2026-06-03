@@ -1,0 +1,194 @@
+"""Fachada principal del Model.
+
+Gestiona el estado completo del juego: jugador, enemigos y combate.
+La Vista y el Presenter acceden al estado del juego a través de esta clase.
+"""
+
+import Constantes
+from .JugadorModel  import JugadorModel
+from .Enemigo1Model import Enemigo1Model
+from .Enemigo2Model import Enemigo2Model
+from .BossModel import BossModel
+
+
+class JuegoModel:
+    """Gestiona el estado completo del juego: jugador, enemigos y combate.
+
+    Actúa como fachada: la Vista y el Presenter acceden al estado
+    del juego a través de esta clase.
+
+    Attributes
+    ----------
+    jugador : JugadorModel
+        Sub-modelo del jugador.
+    enemigos : list of Actor
+        Lista de sub-modelos de enemigos vivos.
+    mover_derecha : bool
+        True mientras la tecla D está pulsada.
+    mover_izquierda : bool
+        True mientras la tecla A está pulsada.
+    """
+
+    def __init__(self, datos_enemigos, datos_boss):
+        self.jugador = JugadorModel()
+
+        self.enemigos = []
+        self.boss = None
+        if datos_boss:
+            self.boss = BossModel(datos_boss['x'], datos_boss['y'])
+        for d in datos_enemigos:
+            if d.get('tipo') == 'volador':
+                self.enemigos.append(
+                    Enemigo2Model(
+                        d['x'], d['y'],
+                        distancia_patrulla=d.get('distancia_patrulla', 150),
+                    )
+                )
+            else:
+                self.enemigos.append(
+                    Enemigo1Model(
+                        d['x'], d['y'],
+                        distancia_patrulla=d.get('distancia_patrulla', 150),
+                        num_frames_ataque=d.get('num_frames_ataque', 6),
+                    )
+                )
+
+        self.mover_derecha   = False
+        self.mover_izquierda = False
+
+        # Usados por tick() para comunicar deltas al boss y recibir pos del jugador
+        self.boss_delta        = (0.0, 0.0)
+        self.jugador_pos_cache = (0, 0)
+
+    # --- Acciones del jugador (delegadas desde el Presenter) ---
+
+    def jugador_saltar(self):
+        self.jugador.saltar()
+
+    def jugador_atacar(self, num_frames_anim):
+        self.jugador.iniciar_ataque(num_frames_anim)
+
+    def jugador_mover_derecha_inicio(self):
+        self.mover_derecha = True
+
+    def jugador_mover_derecha_fin(self):
+        self.mover_derecha = False
+
+    def jugador_mover_izquierda_inicio(self):
+        self.mover_izquierda = True
+
+    def jugador_mover_izquierda_fin(self):
+        self.mover_izquierda = False
+
+    # --- Consultas de combate (llamadas por la Vista al detectar colisiones) ---
+
+    def golpe_jugador_a_enemigo(self, indice):
+        """La Vista notifica que la hitbox del jugador ha tocado al enemigo [indice]."""
+        if 0 <= indice < len(self.enemigos):
+            self.enemigos[indice].recibir_daño(1)
+
+    def golpe_enemigo_a_jugador(self):
+        """La Vista notifica que la hitbox de un enemigo ha tocado al jugador."""
+        self.jugador.recibir_daño(1)
+
+    def golpe_proyectil_a_jugador(self, proyectil):
+        """La Vista notifica que un proyectil ha tocado al jugador."""
+        self.jugador.recibir_daño(1.5)
+        proyectil.vivo = False
+
+    def golpe_jugador_a_proyectil(self, proyectil):
+        """La Vista notifica que la espada del jugador ha destruido un proyectil."""
+        proyectil.vivo = False
+
+    def golpe_jugador_a_boss(self):
+        if self.boss:
+            self.boss.recibir_daño(1)
+
+    def golpe_boss_a_jugador(self):
+        self.jugador.recibir_daño(1.5)
+
+    def golpe_proyectil_boss_a_jugador(self, proyectil):
+        self.jugador.recibir_daño(proyectil.daño)
+        proyectil.vivo = False
+
+    # --- Tick del Model (llamado por el Presenter cada frame) ---
+
+    def tick(self, delta_time_ms):
+        """Avanza los contadores internos del Model.
+
+        No mueve nada: la Vista ya ha movido y colisionado antes de llamar aquí.
+
+        Returns
+        -------
+        list of int
+            Índices de enemigos que han muerto este frame.
+        """
+        if self.mover_derecha:
+            self.jugador.moviendose = True
+            self.jugador.flip       = False
+        elif self.mover_izquierda:
+            self.jugador.moviendose = True
+            self.jugador.flip       = True
+        else:
+            self.jugador.moviendose = False
+
+        self.jugador.tick(delta_time_ms)
+
+        # tick_ia del boss se llama en la Vista (actualizar_fisica) para
+        # que el delta se aplique en el mismo frame. Aquí solo avanzamos iframes.
+        if self.boss and self.boss.vivo:
+            self.boss._tick_iframes(delta_time_ms)
+
+        muertos = [i for i, e in enumerate(self.enemigos) if not e.vivo]
+        for i in reversed(muertos):
+            self.enemigos.pop(i)
+
+        return muertos
+
+    @property
+    def delta_x_jugador(self):
+        """Desplazamiento horizontal del jugador para este frame."""
+        if self.mover_derecha:
+            return Constantes.VELOCIDAD
+        if self.mover_izquierda:
+            return -Constantes.VELOCIDAD
+        return 0
+
+    # --- Guardado / Carga de partida ---
+
+    def obtener_estado_guardado(self):
+        """Devuelve un dict serializable con el estado a persistir.
+
+        La posición NO se incluye aquí: la Vista la añade antes de guardar,
+        ya que en esta arquitectura las posiciones viven en la Vista.
+
+        Returns
+        -------
+        dict
+            Claves: 'hp' (int), 'num_enemigos_vivos' (int).
+        """
+        return {
+            'hp': self.jugador.hp,
+            'num_enemigos_vivos': len(self.enemigos),
+        }
+
+    def cargar_estado_guardado(self, datos):
+        """Restaura el estado lógico del jugador desde un dict cargado de disco.
+
+        Solo restaura hp y flags lógicos. La posición la restaura la Vista
+        directamente sobre el shape del sprite.
+
+        Parameters
+        ----------
+        datos : dict
+            Dict con las mismas claves que devuelve obtener_estado_guardado().
+        """
+        if 'hp' in datos:
+            self.jugador.hp   = max(1, int(datos['hp']))
+            self.jugador.vivo = self.jugador.hp > 0
+
+        # Reiniciar velocidades y estado de ataque para evitar artefactos
+        self.jugador.velocidad_y  = 0
+        self.jugador.atacando     = False
+        self.jugador.iframe_timer = 0
+        self.jugador.coyote_timer = 0

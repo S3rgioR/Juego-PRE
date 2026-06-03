@@ -1,24 +1,32 @@
-import pygame
-# Las constantes son variables fijas que usaremos en todo el juego
+"""Constantes globales del juego.
 
-#-------- PANTALLA--------#
-WIDTH = 1280        # Ancho de la ventana en píxeles
-HEIGHT = 720       # Alto de la ventana en píxeles
-FPS = 60           # Fotogramas por segundo (velocidad del juego)
+IMPORTANTE: Este módulo NO carga imágenes al importarse.
+En la versión original, cargar pygame.image.load() a nivel de módulo
+obligaba a que pygame estuviese inicializado antes de cualquier import,
+lo que rompía el orden de inicialización en el patrón MVP.
 
-#-------- PERSONAJE--------#
-image = pygame.image.load("Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png")
-SCALA_PERSONAJE = 1.5
-WIDTH_PERSONAJE = image.get_width()*0.1*SCALA_PERSONAJE          # Ancho del rectángulo del personaje en píxeles
-HEIGHT_PERSONAJE = image.get_height()*0.35*SCALA_PERSONAJE         # Alto del rectángulo del personaje en píxeles
-COLOR_PERSONAJE = (255, 0, 255)  # Color del personaje en RGB → magenta
-VELOCIDAD = 10                # Píxeles que se mueve el personaje por fotograma
+Las dimensiones del personaje se calculan en main.py tras cargar
+la primera imagen, y se inyectan aquí antes de construir Model y View.
+"""
 
+# -------- PANTALLA -------- #
+WIDTH  = 1280
+HEIGHT = 720
+FPS    = 60
 
-#-------- FONDO--------#
-COLOR_FONDO = (0, 100, 100)   # Color del fondo en RGB → verde azulado
+# -------- PERSONAJE -------- #
+# Estas dos constantes se sobreescriben desde main.py tras cargar la imagen.
+# Se definen aquí con valores de fallback razonables.
+SCALA_PERSONAJE  = 1.5
+WIDTH_PERSONAJE  = 30    # Sobreescrito en main.py
+HEIGHT_PERSONAJE = 60    # Sobreescrito en main.py
+COLOR_PERSONAJE  = (255, 0, 255)
+VELOCIDAD        = 10
 
-#-------- FISICA --------#
-GRAVEDAD = 0.6        # Cuánto aumenta la velocidad de caída cada fotograma
-FUERZA_SALTO = -15    # Velocidad vertical al saltar (negativa = hacia arriba)
-VELOCIDAD_MAX_CAIDA = 20  # Límite de velocidad de caída (para que no caiga infinitamente rápido)
+# -------- FONDO -------- #
+COLOR_FONDO = (0, 100, 100)
+
+# -------- FÍSICA -------- #
+GRAVEDAD           = 0.6
+FUERZA_SALTO       = -15
+VELOCIDAD_MAX_CAIDA = 20
