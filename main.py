@@ -83,6 +83,11 @@ def main():
         "Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
     anim_volador_walk = cargar_frames(
         "Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
+    # --- Animaciones del boss ---
+    anim_boss_nofiro = cargar_frames(
+        "Assets/Characters/Fire-Skull-Files/Sprites/NoFire/frame{}.png", 4, s)
+    anim_boss_fire = cargar_frames(
+        "Assets/Characters/Fire-Skull-Files/Sprites/Fire/frame{}.png", 8, s)
 
     # --- Datos de enemigos ---
     # 'x', 'y' y 'distancia_patrulla' los usa el Model para fijar la IA.
@@ -112,18 +117,28 @@ def main():
         },
     ]
 
+    # --- Datos del boss (separado de datos_enemigos) ---
+    datos_boss = {
+        'tipo': 'boss',
+        'x': 3050,
+        'y': 400,
+        'anim_fase1': anim_boss_nofiro,
+        'anim_fase2': anim_boss_fire,
+    }
+
     # ---------------------------------------------------------------------------
     # Composición MVP
     # ---------------------------------------------------------------------------
 
     # 1. Model: reglas de juego. Solo necesita datos escalares de cada enemigo.
-    modelo = JuegoModel(datos_enemigos)
+    modelo = JuegoModel(datos_enemigos, datos_boss)
 
     # 2. View: física, sprites, cámara.
     vista = PygameView(
         frames_jugador=frames_jugador,
         datos_enemigos=datos_enemigos,
         nivel_loader=cargar_nivel_1,
+        datos_boss=datos_boss,
     )
 
     # 3. Presenter: conecta Model y View, gestiona el game loop.

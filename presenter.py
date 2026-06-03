@@ -137,6 +137,6 @@ class JuegoPresenter:
             # 6. Renderizar
             estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
             estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
-            self.vista.renderizar(estado_jugador, estados_enemigos)
+            self.vista.renderizar(estado_jugador, estados_enemigos, self.modelo)
 
         pygame.quit()
