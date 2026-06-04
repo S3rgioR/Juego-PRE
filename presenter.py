@@ -14,6 +14,7 @@ Flujo por frame en ejecutar():
 """
 
 from SaveManager import SaveManager
+from model import BossModel
 from model.Enemigo1Model import Enemigo1Model
 
 
@@ -41,6 +42,8 @@ class JuegoPresenter:
             self.vista.evt_atacar.add_listener(audio.sfx_ataque_jugador)
         if audio:
             Enemigo1Model.on_ataque = audio.sfx_ataque_ogro
+        if audio:
+            BossModel.on_disparo = audio.sfx_ataque_boss
         self.modelo     = modelo
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
@@ -144,7 +147,7 @@ class JuegoPresenter:
                         enemigo_muerto = self.modelo.enemigos[i] if i < len(self.modelo.enemigos) else None
                         tipo = 'volador' if isinstance(enemigo_muerto, Enemigo2Model) else 'terrestre'
                         self.audio.sfx_muerte_enemigo(tipo)
-                        self.vista.eliminar_sprite_enemigo(i)
+
 
                      # Muerte del boss
                     if (self.audio and self.modelo.boss
@@ -152,7 +155,7 @@ class JuegoPresenter:
                         and not getattr(self, '_boss_muerto_sonado', False)):
                         self.audio.sfx_muerte_boss()
                         self.audio.cambiar_musica("Assets/Audio/Boss/evil-laugh.mp3")
-                        self._boss_muerto_sonado = True
+
 
                 # 5. Eliminar sprites de enemigos muertos
                 for i in reversed(muertos):

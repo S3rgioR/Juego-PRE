@@ -144,6 +144,7 @@ class PygameView:
                 sprite.proyectil_frames = frames_proyectil
         if audio:
             Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
+
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
         self.evt_mover_derecha_inicio   = Event()
@@ -301,6 +302,8 @@ class PygameView:
                     # Impacto con jugador
                     if p.shape.colliderect(self.sprite_jugador.shape):
                         modelo.golpe_proyectil_boss_a_jugador(p)
+                        self.audio.sfx_hurt_jugador()
+
 
             # Colisión hitbox jugador con boss (cuerpo a cuerpo solo si embestida)
             if modelo.boss.embestida_activa:
@@ -479,6 +482,8 @@ class PygameView:
             if (enemigo_m.hitbox_ataque
                     and enemigo_m.hitbox_ataque.colliderect(shape_jugador)):
                 modelo.golpe_enemigo_a_jugador()
+                self.audio.sfx_hurt_jugador()
+
 
             # Proyectiles del enemigo
             if hasattr(enemigo_m, 'proyectiles'):
@@ -488,9 +493,11 @@ class PygameView:
                     # Proyectil toca al jugador
                     if p.shape.colliderect(shape_jugador):
                         modelo.golpe_proyectil_a_jugador(p)
+                        self.audio.sfx_hurt_jugador()
                     # Jugador destruye el proyectil con la espada
                     elif hitbox_jugador and hitbox_jugador.colliderect(p.shape):
                         modelo.golpe_jugador_a_proyectil(p)
+
 
         # Actualizar hitbox de ataque en el Model para que la Vista la dibuje
         self.sprite_jugador._hitbox_ataque_cache = hitbox_jugador

@@ -55,7 +55,7 @@ def main():
 
     pygame.init()
     audio = AudioManager()
-    audio.reproducir_musica("Assets/Audio/Music/level1.ogg")
+    audio.reproducir_musica("Assets/Audio/Music/Ambient_Lingering_Action.wav")
 
     s = Constantes.SCALA_PERSONAJE
 

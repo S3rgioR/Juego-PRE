@@ -121,7 +121,9 @@ class AudioManager:
             'ataque_enemigo2': 'Assets/Audio/Ghost/shot_Ghost.wav',
             'muerte_enemigo2': 'Assets/Audio/Ogro/enemy-death.wav',
             'muerte_boss':     'Assets/Audio/Ogro/enemy-death.wav',
-            'rugidos_boss':     'Assets/Audio/Boss/evil-laugh.ogg'
+            'ataque_boss':     'Assets/Audio/Boss/explosion.wav',
+            'rugidos_boss':    'Assets/Audio/Boss/evil-laugh.ogg',
+            'hurt_jugador':    'Assets/Audio/Player/hurt.ogg'
         }
         for clave, ruta in mapa.items():
             self._sfx[clave] = self._cargar_sfx(ruta)
@@ -233,6 +235,13 @@ class AudioManager:
     def sfx_ataque_ogro(self):
         """Reproduce el golpe del ogro. Llamar cuando su hitbox se activa."""
         self._reproducir('ataque_ogro')
+    def sfx_ataque_boss(self):
+        """Reproduce el golpe del ogro. Llamar cuando su hitbox se activa."""
+        self._reproducir('ataque_boss')
+    def sfx_hurt_jugador(self):
+        """Reproduce el golpe del ogro. Llamar cuando su hitbox se activa."""
+        self._reproducir('hurt_jugador')
+
 
     def sfx_ataque_enemigo2(self):
         """Reproduce el disparo del fantasma. Llamar al crear un proyectil."""
