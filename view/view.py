@@ -76,10 +76,7 @@ class PygameView:
         """Inicializa pygame, la ventana, los fondos, los sprites y los eventos."""
         pygame.init()
 
-        self.screen = pygame.display.set_mode(
-            (Constantes.WIDTH, Constantes.HEIGHT),
-            pygame.DOUBLEBUF
-        )
+        self.screen = pygame.display.get_surface()
         pygame.display.set_caption("Juego de Plataformas - MVP")
 
         self.reloj  = pygame.time.Clock()
@@ -138,6 +135,17 @@ class PygameView:
                     Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack'])
                 )
 
+        # --- Frames del proyectil ---
+        escala_proj = Constantes.SCALA_PERSONAJE * 0.6
+        frames_proyectil = []
+        for i in range(1, 3):
+            img = pygame.image.load(
+                f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
+            ).convert_alpha()
+            w = int(img.get_width()  * escala_proj)
+            h = int(img.get_height() * escala_proj)
+            frames_proyectil.append(pygame.transform.scale(img, (w, h)))
+
         for sprite in self.sprites_enemigos:
             if isinstance(sprite, Enemigo2Sprite):
                 sprite.proyectil_frames = frames_proyectil
@@ -152,6 +160,7 @@ class PygameView:
         self.evt_atacar                 = Event()
         self.evt_guardar                = Event()   # K cerca del checkpoint
         self.evt_cargar                 = Event()   # F10
+        self.evt_pausa                  = Event()   # ESC → abre/cierra pausa
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
@@ -193,15 +202,15 @@ class PygameView:
     # Input
     # ------------------------------------------------------------------
 
-    def procesar_input(self):
-        """Captura eventos pygame y emite los eventos MVP correspondientes."""
-        for event in pygame.event.get():
+    def procesar_input(self, events):
+        """Procesa la lista de eventos pygame y emite los eventos MVP correspondientes."""
+        for event in events:
             if event.type == pygame.QUIT:
                 self.evt_cerrar.emit()
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.evt_cerrar.emit()
+                    self.evt_pausa.emit()
                 elif event.key == pygame.K_d:
                     self.evt_mover_derecha_inicio.emit()
                 elif event.key == pygame.K_a:
@@ -538,6 +547,7 @@ class PygameView:
 
         # 9. Presentar frame
         pygame.display.flip()
+
     def obtener_estado_jugador(self, modelo):
         """Construye el dict de estado del jugador combinando Model y Vista.
 
