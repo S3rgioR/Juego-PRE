@@ -33,6 +33,7 @@ Nota sobre convert_alpha():
 
 import pygame
 import Constantes
+from model.Enemigo2Model import Enemigo2Model
 
 from .Event     import Event
 from .Camara    import Camara
@@ -42,6 +43,7 @@ from .Enemigo_2 import Enemigo2Sprite
 from .Plataforma import Plataforma
 from .CheckpointView import CheckpointView
 from Nivel import CHECKPOINT_NIVEL_1
+from .BossSprite import BossSprite
 
 
 class PygameView:
@@ -71,9 +73,14 @@ class PygameView:
     evt_saltar, evt_atacar.
     """
 
-    def __init__(self, frames_jugador, datos_enemigos, nivel_loader):
-        """Inicializa fondos, sprites y eventos. pygame ya lo inicializa main()."""
-        self.screen = pygame.display.get_surface()
+    def __init__(self, frames_jugador, datos_enemigos, nivel_loader,datos_boss, audio=None):
+        """Inicializa pygame, la ventana, los fondos, los sprites y los eventos."""
+        pygame.init()
+
+        self.screen = pygame.display.set_mode(
+            (Constantes.WIDTH, Constantes.HEIGHT),
+            pygame.DOUBLEBUF
+        )
         pygame.display.set_caption("Juego de Plataformas - MVP")
 
         self.reloj  = pygame.time.Clock()
@@ -98,8 +105,28 @@ class PygameView:
         ).convert_alpha()
         self.sprites_plataformas = nivel_loader(tileset)
 
+        # --- Frames del proyectil (se cargan primero para usarlos en boss y enemigos) ---
+        escala_proj = Constantes.SCALA_PERSONAJE * 0.6
+        frames_proyectil = []
+        for i in range(1, 3):
+            img = pygame.image.load(
+                f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
+            ).convert_alpha()
+            w = int(img.get_width()  * escala_proj)
+            h = int(img.get_height() * escala_proj)
+            frames_proyectil.append(pygame.transform.scale(img, (w, h)))
+
         # --- Sprites ---
         self.sprite_jugador = PersonajeSprite(250, 250, frames_jugador)
+
+        self.sprite_boss = None
+        if datos_boss:
+            self.sprite_boss = BossSprite(
+                datos_boss['x'], datos_boss['y'],
+                datos_boss['anim_fase1'],
+                datos_boss['anim_fase2'],
+            )
+            self.sprite_boss.proyectil_frames = frames_proyectil
 
         self.sprites_enemigos = []
         for d in datos_enemigos:
@@ -112,21 +139,11 @@ class PygameView:
                     Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack'])
                 )
 
-        # --- Frames del proyectil ---
-        escala_proj = Constantes.SCALA_PERSONAJE * 0.6
-        frames_proyectil = []
-        for i in range(1, 3):
-            img = pygame.image.load(
-                f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
-            ).convert_alpha()
-            w = int(img.get_width()  * escala_proj)
-            h = int(img.get_height() * escala_proj)
-            frames_proyectil.append(pygame.transform.scale(img, (w, h)))
-
         for sprite in self.sprites_enemigos:
             if isinstance(sprite, Enemigo2Sprite):
                 sprite.proyectil_frames = frames_proyectil
-
+        if audio:
+            Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
         self.evt_mover_derecha_inicio   = Event()
@@ -137,7 +154,7 @@ class PygameView:
         self.evt_atacar                 = Event()
         self.evt_guardar                = Event()   # K cerca del checkpoint
         self.evt_cargar                 = Event()   # F10
-        self.evt_pausa                  = Event()   # ESC → abre/cierra pausa
+        self.audio = audio
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
@@ -179,15 +196,15 @@ class PygameView:
     # Input
     # ------------------------------------------------------------------
 
-    def procesar_input(self, events):
-        """Procesa la lista de eventos pygame y emite los eventos MVP correspondientes."""
-        for event in events:
+    def procesar_input(self):
+        """Captura eventos pygame y emite los eventos MVP correspondientes."""
+        for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.evt_cerrar.emit()
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.evt_pausa.emit()
+                    self.evt_cerrar.emit()
                 elif event.key == pygame.K_d:
                     self.evt_mover_derecha_inicio.emit()
                 elif event.key == pygame.K_a:
@@ -201,12 +218,18 @@ class PygameView:
                         self.evt_guardar.emit()
                 elif event.key == pygame.K_F10:
                     self.evt_cargar.emit()
+                elif event.key == pygame.K_SPACE:
+                    self.evt_saltar.emit()
+                    # El sonido de salto se dispara desde el Presenter
+                    # NO llamar aquí para evitar doble disparo si el salto falla.
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
                     self.evt_mover_derecha_fin.emit()
                 elif event.key == pygame.K_a:
                     self.evt_mover_izquierda_fin.emit()
+
+
 
     # ------------------------------------------------------------------
     # Física
@@ -235,6 +258,65 @@ class PygameView:
         self._mover_proyectiles(modelo)
         self._detectar_combate(modelo)
 
+        hitbox_espada = self._calcular_hitbox_ataque_jugador(
+            self.sprite_jugador.shape, modelo.jugador.flip
+        ) if modelo.jugador.atacando else None
+
+        if self.sprite_boss and modelo.boss and modelo.boss.vivo:
+            # Sincronizar posición interna del Model con el sprite ANTES del tick
+            modelo.boss._x = float(self.sprite_boss.shape.centerx)
+            modelo.boss._y = float(self.sprite_boss.shape.centery)
+            # Guardar posición del jugador para que el Model la use
+            modelo.jugador_pos_cache = self.sprite_jugador.shape.center
+            # Llamar tick_ia aquí para obtener el delta de ESTE frame
+            pos_boss    = self.sprite_boss.shape.center
+            pos_jugador = self.sprite_jugador.shape.center
+            modelo.boss._last_jpos = pos_jugador
+            dx, dy, _ = modelo.boss.tick_ia(pos_boss, pos_jugador, delta_time_ms)
+            modelo.boss_delta = (dx, dy)
+            self.sprite_boss.shape.x += int(dx)
+            self.sprite_boss.shape.y += int(dy)
+
+            # Colisión proyectiles del boss con el jugador
+            for p in modelo.boss.proyectiles:
+                if p.vivo:
+                    # Mover proyectil
+                    p._x += p.vel_x
+                    p._y += p.vel_y
+                    p.shape.center = (int(p._x), int(p._y))
+                    # Fuera del mundo → matar (coordenadas de mundo, no de pantalla)
+                    if (p.shape.right < -2000 or p.shape.left > 8000
+                            or p.shape.bottom < -1000 or p.shape.top > 1500):
+                        p.vivo = False
+                        continue
+                    # Colisión con plataformas → matar
+                    for plat in self.sprites_plataformas:
+                        if p.shape.colliderect(plat.shape):
+                            p.vivo = False
+                            break
+
+                    # Espada del jugador destruye el proyectil
+                    if p.vivo and hitbox_espada and hitbox_espada.colliderect(p.shape):
+                        p.vivo = False
+                    # Impacto con jugador
+                    if p.shape.colliderect(self.sprite_jugador.shape):
+                        modelo.golpe_proyectil_boss_a_jugador(p)
+
+            # Colisión hitbox jugador con boss (cuerpo a cuerpo solo si embestida)
+            if modelo.boss.embestida_activa:
+                if self.sprite_boss.shape.colliderect(self.sprite_jugador.shape):
+                    modelo.golpe_boss_a_jugador()
+
+            # Colisión espada jugador → boss
+            hitbox_espada = self.sprite_jugador.hitbox_ataque
+            if hitbox_espada and hitbox_espada.colliderect(self.sprite_boss.shape):
+                modelo.golpe_jugador_a_boss()
+
+            # Guardar posición del jugador para el Model
+            modelo.jugador_pos_cache = self.sprite_jugador.shape.center
+
+            if self.audio and modelo.boss and modelo.boss.vivo:
+                self.audio.tick_rugido_boss()
     # --- Movimiento del jugador ---
 
     def _mover_jugador(self, modelo, delta_time_ms):
@@ -289,6 +371,9 @@ class PygameView:
             shape.top    = 0
             jugador_m._y = float(shape.y)
             jugador_m.notificar_golpe_techo()
+        # Pasos (solo si está en suelo y moviéndose)
+        if self.audio and tocando_suelo and abs(modelo.delta_x_jugador) > 0:
+            self.audio.sfx_paso()
 
     # --- Movimiento de enemigos ---
 
@@ -420,7 +505,7 @@ class PygameView:
     # Render
     # ------------------------------------------------------------------
 
-    def renderizar(self, estado_jugador, estados_enemigos):
+    def renderizar(self, estado_jugador, estados_enemigos, modelo=None):
         """Sincroniza sprites con el estado del Model y dibuja el frame completo.
 
         Parameters
@@ -429,6 +514,8 @@ class PygameView:
             Estado lógico del jugador exportado por el Model.
         estados_enemigos : list of dict
             Estados lógicos de los enemigos vivos.
+        modelo : JuegoModel, optional
+            Necesario para renderizar el boss si existe.
         """
         # 1. Sincronizar jugador con su estado lógico y actualizar cámara
         self.sprite_jugador.sincronizar(estado_jugador)
@@ -452,15 +539,20 @@ class PygameView:
             sprite.sincronizar(estado)
             sprite.draw(self.screen, self.camara, estado)
 
-        # 5. Jugador (encima de todo)
+        # 6. Boss
+        if self.sprite_boss and modelo is not None and modelo.boss and modelo.boss.vivo:
+            estado_boss = modelo.boss.obtener_estado(self.sprite_boss.shape.center)
+            self.sprite_boss.sincronizar(estado_boss)
+            self.sprite_boss.draw(self.screen, self.camara, estado_boss)
+
+        # 7. Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
 
-        # 6. HUD
+        # 8. HUD
         self.dibujar_hud(estado_jugador)
 
-        # 7. Presentar frame
+        # 9. Presentar frame
         pygame.display.flip()
-
     def obtener_estado_jugador(self, modelo):
         """Construye el dict de estado del jugador combinando Model y Vista.
 

@@ -69,6 +69,7 @@ class Enemigo2Model(Actor):
         ex, ey = pos_enemigo
         jx, jy = pos_jugador
 
+
         delta_x   = self._calcular_patrulla(ex)
         en_vision = math.hypot(jx - ex, jy - ey) <= self.rango_vision
 
@@ -80,7 +81,17 @@ class Enemigo2Model(Actor):
             nuevos.append(p)
             self.ultimo_disparo = ahora
 
+            p = ProyectilModel(ex, ey, jx, jy)
+            self.proyectiles.append(p)
+            nuevos.append(p)
+
+            if hasattr(self, 'on_disparo'):
+                self.on_disparo()
+
+
         return delta_x, nuevos
+
+
 
     # --- Exportar estado ---
 

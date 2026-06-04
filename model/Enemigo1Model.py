@@ -105,8 +105,16 @@ class Enemigo1Model(Actor):
                 self.hitbox_ataque = None
                 self._frame_index  = 0
             elif self.ataque_frame_inicio <= self._frame_index <= self.ataque_frame_fin:
+                if self._frame_index == self.ataque_frame_inicio:
+                    # Primera vez que entra en la ventana de golpe → emitir evento
+                    if not getattr(self, '_sonido_ataque_emitido', False):
+                        self._sonido_ataque_emitido = True
+                        # No podemos llamar audio desde el Model; usar callback opcional:
+                        if hasattr(self, 'on_ataque'):
+                            self.on_ataque()
                 self.hitbox_ataque = self._calcular_hitbox_ataque(ex, ey)
             else:
+                self._sonido_ataque_emitido = False
                 self.hitbox_ataque = None
 
         return delta_x, self.hitbox_ataque
