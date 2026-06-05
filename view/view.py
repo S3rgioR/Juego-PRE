@@ -41,6 +41,7 @@ from .Enemigo_1 import Enemigo1Sprite
 from .Enemigo_2 import Enemigo2Sprite
 from .Plataforma import Plataforma
 from .CheckpointView import CheckpointView
+from .AngelView import AngelView
 from Nivel import CHECKPOINT_NIVEL_1
 from .BossSprite import BossSprite
 
@@ -64,16 +65,28 @@ class PygameView:
         Sprites visuales y shapes físicos de los enemigos.
     sprites_plataformas : list of Plataforma
         Geometría y visualización del nivel.
+    sprite_angel : AngelView
+        Sprite del ángel curador.
 
     Eventos emitidos
     ----------------
     evt_cerrar, evt_mover_derecha_inicio, evt_mover_derecha_fin,
     evt_mover_izquierda_inicio, evt_mover_izquierda_fin,
-    evt_saltar, evt_atacar.
+    evt_saltar, evt_atacar, evt_curar.
     """
 
-    def __init__(self, frames_jugador, datos_enemigos, nivel_loader,datos_boss):
-        """Inicializa pygame, la ventana, los fondos, los sprites y los eventos."""
+    def __init__(self, frames_jugador, datos_enemigos, nivel_loader, datos_boss,
+                 frames_angel=None, datos_angel=None):
+        """Inicializa pygame, la ventana, los fondos, los sprites y los eventos.
+
+        Parameters
+        ----------
+        frames_angel : list of pygame.Surface, optional
+            Los 8 frames del ángel. Si es None se intenta cargar desde main.
+        datos_angel : dict, optional
+            {'x': int, 'y': int}. Posición del ángel en el mundo.
+            Por defecto se coloca en (2200, 400).
+        """
         pygame.init()
 
         self.screen = pygame.display.get_surface()
@@ -135,20 +148,15 @@ class PygameView:
                     Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack'])
                 )
 
-        # --- Frames del proyectil ---
-        escala_proj = Constantes.SCALA_PERSONAJE * 0.6
-        frames_proyectil = []
-        for i in range(1, 3):
-            img = pygame.image.load(
-                f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
-            ).convert_alpha()
-            w = int(img.get_width()  * escala_proj)
-            h = int(img.get_height() * escala_proj)
-            frames_proyectil.append(pygame.transform.scale(img, (w, h)))
-
+        # --- Frames del proyectil (segunda pasada para asignar a enemigos voladores) ---
         for sprite in self.sprites_enemigos:
             if isinstance(sprite, Enemigo2Sprite):
                 sprite.proyectil_frames = frames_proyectil
+
+        # --- Ángel curador ---
+        pos_angel = (datos_angel['x'], datos_angel['y']) if datos_angel else (2200, 400)
+        self.sprite_angel = AngelView(pos_angel[0], pos_angel[1],
+                                      frames_angel or [])
 
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
@@ -161,6 +169,7 @@ class PygameView:
         self.evt_guardar                = Event()   # K cerca del checkpoint
         self.evt_cargar                 = Event()   # F10
         self.evt_pausa                  = Event()   # ESC → abre/cierra pausa
+        self.evt_curar                  = Event()   # K cerca del ángel
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
@@ -220,7 +229,10 @@ class PygameView:
                 elif event.key == pygame.K_j:
                     self.evt_atacar.emit()
                 elif event.key == pygame.K_k:
-                    if self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
+                    # Prioridad: ángel > checkpoint (si se solapan, cura)
+                    if self.sprite_angel.esta_cerca(self.sprite_jugador.shape):
+                        self.evt_curar.emit()
+                    elif self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
                         self.evt_guardar.emit()
                 elif event.key == pygame.K_F10:
                     self.evt_cargar.emit()
@@ -524,28 +536,33 @@ class PygameView:
             plat.draw(self.screen, self.camara)
 
         # 4. Checkpoint
-        cerca = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
-        self.sprite_checkpoint.set_mostrar_prompt(cerca)
+        cerca_checkpoint = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
+        self.sprite_checkpoint.set_mostrar_prompt(cerca_checkpoint)
         self.sprite_checkpoint.draw(self.screen, self.camara)
 
-        # 5. Enemigos
+        # 5. Ángel curador
+        cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
+        self.sprite_angel.set_mostrar_prompt(cerca_angel)
+        self.sprite_angel.draw(self.screen, self.camara)
+
+        # 6. Enemigos
         for sprite, estado in zip(self.sprites_enemigos, estados_enemigos):
             sprite.sincronizar(estado)
             sprite.draw(self.screen, self.camara, estado)
 
-        # 6. Boss
+        # 7. Boss
         if self.sprite_boss and modelo is not None and modelo.boss and modelo.boss.vivo:
             estado_boss = modelo.boss.obtener_estado(self.sprite_boss.shape.center)
             self.sprite_boss.sincronizar(estado_boss)
             self.sprite_boss.draw(self.screen, self.camara, estado_boss)
 
-        # 7. Jugador (encima de todo)
+        # 8. Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
 
-        # 8. HUD
+        # 9. HUD
         self.dibujar_hud(estado_jugador)
 
-        # 9. Presentar frame
+        # 10. Presentar frame
         pygame.display.flip()
 
     def obtener_estado_jugador(self, modelo):

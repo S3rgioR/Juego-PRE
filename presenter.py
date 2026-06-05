@@ -62,6 +62,7 @@ class JuegoPresenter:
         self.vista.evt_atacar.add_listener(self._atacar)
         self.vista.evt_guardar.add_listener(self._guardar_partida)
         self.vista.evt_cargar.add_listener(self._cargar_partida)
+        self.vista.evt_curar.add_listener(self._curar_jugador)
 
     # --- Handlers de eventos ---
 
@@ -117,6 +118,12 @@ class JuegoPresenter:
 
     def _atacar(self):
         self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
+
+    def _curar_jugador(self):
+        """El ángel cura al jugador y dispara el destello dorado."""
+        self.modelo.curar_jugador()
+        self.vista.sprite_angel.activar_destello()
+        print("[Presenter] ✓ Jugador curado por el ángel")
 
     def _guardar_partida(self):
         """Guarda posición (de la Vista), hp (del Model) y cámara."""
@@ -199,4 +206,3 @@ class JuegoPresenter:
             estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
             estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
             self.vista.renderizar(estado_jugador, estados_enemigos, self.modelo)
-

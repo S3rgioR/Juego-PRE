@@ -66,15 +66,18 @@ def iniciar_partida(cargar_save=False):
         "Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
     anim_volador_walk = cargar_frames(
         "Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
+
     # --- Animaciones del boss ---
     anim_boss_nofiro = cargar_frames(
         "Assets/Characters/Fire-Skull-Files/Sprites/NoFire/frame{}.png", 4, s)
     anim_boss_fire = cargar_frames(
         "Assets/Characters/Fire-Skull-Files/Sprites/Fire/frame{}.png", 8, s)
 
+    # --- Animaciones del ángel curador ---
+    frames_angel = cargar_frames(
+        "Assets/Characters/angel/sprites/angel{}.png", 8, s)
+
     # --- Datos de enemigos ---
-    # 'x', 'y' y 'distancia_patrulla' los usa el Model para fijar la IA.
-    # 'anim_walk' y 'anim_attack' los usa la Vista para crear los sprites.
     datos_enemigos = [
         {
             'tipo': 'terrestre', 'x': 600, 'y': 400,
@@ -93,7 +96,7 @@ def iniciar_partida(cargar_save=False):
         },
     ]
 
-    # --- Datos del boss (separado de datos_enemigos) ---
+    # --- Datos del boss ---
     datos_boss = {
         'tipo': 'boss',
         'x': 3050,
@@ -102,21 +105,30 @@ def iniciar_partida(cargar_save=False):
         'anim_fase2': anim_boss_fire,
     }
 
+    # --- Datos del ángel curador ---
+    datos_angel = {
+        'x': 0,
+        'y': 550,
+    }
+
     # ---------------------------------------------------------------------------
     # Composición MVP
     # ---------------------------------------------------------------------------
 
-    # 1. Model: reglas de juego. Solo necesita datos escalares de cada enemigo.
+    # 1. Model
     modelo = JuegoModel(datos_enemigos, datos_boss)
 
-    # 2. View: física, sprites, cámara.
+    # 2. View
     vista = PygameView(
         frames_jugador=frames_jugador,
         datos_enemigos=datos_enemigos,
         nivel_loader=cargar_nivel_1,
         datos_boss=datos_boss,
+        frames_angel=frames_angel,
+        datos_angel=datos_angel,
     )
 
+    # 3. Presenter
     presenter = JuegoPresenter(vista, modelo,
                                num_frames_ataque_jugador=len(frames_jugador['AtaqueParado']))
 
@@ -125,7 +137,7 @@ def iniciar_partida(cargar_save=False):
 
     # 4. Iniciar el game loop
     presenter.ejecutar()
-    return presenter   # main() lee presenter.salida_forzada
+    return presenter
 
 
 def main():
@@ -151,14 +163,12 @@ def main():
         elif accion == 'jugar':
             presenter = iniciar_partida(cargar_save=False)
             if presenter.salida_forzada:
-                break   # X de la ventana → cerrar todo
+                break
 
         elif accion == 'cargar':
             presenter = iniciar_partida(cargar_save=True)
             if presenter.salida_forzada:
-                break   # X de la ventana → cerrar todo
-
-        # Si salida_forzada es False → volver al menú principal
+                break
 
     pygame.quit()
     sys.exit()

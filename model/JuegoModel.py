@@ -80,6 +80,12 @@ class JuegoModel:
     def jugador_mover_izquierda_fin(self):
         self.mover_izquierda = False
 
+    # --- Curación ---
+
+    def curar_jugador(self):
+        """El ángel cura al jugador hasta su vida máxima."""
+        self.jugador.curar_completo()
+
     # --- Consultas de combate (llamadas por la Vista al detectar colisiones) ---
 
     def golpe_jugador_a_enemigo(self, indice):

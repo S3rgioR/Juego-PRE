@@ -21,11 +21,12 @@ class JugadorModel(Actor):
         Milisegundos restantes de margen para saltar tras caer del borde.
     """
 
+    HP_MAX        = 5     # vida máxima del jugador
     COYOTE_TIME   = 300   # ms de margen para saltar tras caer del borde
     COOLDOWN_ANIM = 70    # ms entre frames de la animación de ataque
 
     def __init__(self):
-        super().__init__(hp=5, iframe_duracion=1000)
+        super().__init__(hp=self.HP_MAX, iframe_duracion=1000)
         self.flip         = False
         self.moviendose   = False
         self.coyote_timer = 0
@@ -50,6 +51,11 @@ class JugadorModel(Actor):
             self.velocidad_y  = Constantes.FUERZA_SALTO
             self.en_suelo     = False
             self.coyote_timer = 0
+
+    def curar_completo(self):
+        """Restaura los puntos de vida del jugador al máximo."""
+        self.hp   = self.HP_MAX
+        self.vivo = True
 
     # --- Notificaciones de la Vista ---
 
