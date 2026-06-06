@@ -1,4 +1,8 @@
-"""Fachada principal del Model."""
+"""Fachada principal del Model.
+
+Gestiona el estado completo del juego: jugador, enemigos y combate.
+La Vista y el Presenter acceden al estado del juego a través de esta clase.
+"""
 
 import Constantes
 from .JugadorModel  import JugadorModel
@@ -8,7 +12,11 @@ from .BossModel     import BossModel
 
 
 class JuegoModel:
+    """Gestiona el estado completo del juego: jugador, enemigos y combate.
 
+    Actúa como fachada: la Vista y el Presenter acceden al estado
+    del juego a través de esta clase.
+    """
     def __init__(self, datos_enemigos, datos_boss):
         self.jugador = JugadorModel()
 
@@ -19,16 +27,23 @@ class JuegoModel:
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
                 self.enemigos.append(
-                    Enemigo2Model(d['x'], d['y'],
-                                  distancia_patrulla=d.get('distancia_patrulla', 150)))
+                    Enemigo2Model(
+                        d['x'], d['y'],
+                        distancia_patrulla=d.get('distancia_patrulla', 150),
+                    )
+                )
             else:
                 self.enemigos.append(
-                    Enemigo1Model(d['x'], d['y'],
-                                  distancia_patrulla=d.get('distancia_patrulla', 150),
-                                  num_frames_ataque=d.get('num_frames_ataque', 6)))
+                    Enemigo1Model(
+                        d['x'], d['y'],
+                        distancia_patrulla=d.get('distancia_patrulla', 150),
+                        num_frames_ataque=d.get('num_frames_ataque', 6),
+                    )
+                )
 
         self.mover_derecha   = False
         self.mover_izquierda = False
+
         self.boss_delta        = (0.0, 0.0)
         self.jugador_pos_cache = (0, 0)
 
@@ -63,6 +78,7 @@ class JuegoModel:
     # --- Combate ---
 
     def golpe_jugador_a_enemigo(self, indice):
+        """La Vista notifica que la hitbox del jugador ha tocado al enemigo [indice]."""
         if 0 <= indice < len(self.enemigos):
             self.enemigos[indice].recibir_daño(1)
 
@@ -88,9 +104,18 @@ class JuegoModel:
             self.boss.recibir_daño(proyectil.daño)
         proyectil.vivo = False
 
-    # --- Tick ---
+    # --- Tick del Model (llamado por el Presenter cada frame) ---
 
     def tick(self, delta_time_ms):
+        """Avanza los contadores internos del Model.
+
+        No mueve nada: la Vista ya ha movido y colisionado antes de llamar aquí.
+
+        Returns
+        -------
+        list of int
+            Índices de enemigos que han muerto este frame.
+        """
         if self.mover_derecha:
             self.jugador.moviendose = True
             self.jugador.flip       = False
@@ -105,9 +130,14 @@ class JuegoModel:
         if self.boss and self.boss.vivo:
             self.boss._tick_iframes(delta_time_ms)
 
-        muertos = [i for i, e in enumerate(self.enemigos) if not e.vivo]
-        for i in reversed(muertos):
+        # Recopilar índices Y tipo ANTES de eliminarlos de la lista
+        muertos = [
+            (i, 'volador' if isinstance(e, Enemigo2Model) else 'terrestre')
+            for i, e in enumerate(self.enemigos) if not e.vivo
+        ]
+        for i, _ in reversed(muertos):
             self.enemigos.pop(i)
+
         return muertos
 
     @property
@@ -116,9 +146,19 @@ class JuegoModel:
         if self.mover_izquierda: return -Constantes.VELOCIDAD
         return 0
 
-    # --- Guardado / Carga ---
+    # --- Guardado / Carga de partida ---
 
     def obtener_estado_guardado(self):
+        """Devuelve un dict serializable con el estado a persistir.
+
+        La posición NO se incluye aquí: la Vista la añade antes de guardar,
+        ya que en esta arquitectura las posiciones viven en la Vista.
+
+        Returns
+        -------
+        dict
+            Claves: 'hp' (int), 'num_enemigos_vivos' (int).
+        """
         return {
             'hp':     self.jugador.hp,
             'hp_max': self.jugador.hp_max,
@@ -126,6 +166,8 @@ class JuegoModel:
             # Al cargar, se deduce de 'daga_recogida' (estado del objeto en el mapa):
             # si el objeto ya fue recogido antes del save → se desbloquea al cargar.
             # Si fue recogido DESPUÉS del save → objeto reaparece, habilidad no activa.
+            'num_enemigos_vivos': len(self.enemigos),
+
         }
 
     def cargar_estado_guardado(self, datos):
@@ -138,6 +180,7 @@ class JuegoModel:
         # NO desde aquí. Aseguramos que siempre empieza desactivada al cargar.
         self.jugador.daga_desbloqueada = False
 
+        # Reiniciar velocidades y estado de ataque para evitar artefactos
         self.jugador.velocidad_y  = 0
         self.jugador.atacando     = False
         self.jugador.iframe_timer = 0

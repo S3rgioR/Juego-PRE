@@ -1,7 +1,39 @@
-"""Capa View del patrón MVP - Física, entrada, visualización y eventos."""
+"""Capa View del patrón MVP - Física, entrada, visualización y eventos.
+
+Responsabilidades:
+- Inicializar pygame y la ventana gráfica
+- Capturar entrada del usuario (teclado, cierre de ventana)
+- Mover todos los objetos del juego (jugador y enemigos)
+- Detectar colisiones entre objetos y notificar al Model
+- Actualizar la cámara
+- Renderizar todos los sprites
+- Emitir eventos que el Presenter escucha
+
+Lo que NO hace la Vista:
+- Decidir qué ocurre cuando hay una colisión (responsabilidad del Model)
+- Gestionar hp, iframes ni cooldowns (responsabilidad del Model)
+- Coordinar el flujo del juego (responsabilidad del Presenter)
+
+Filosofía de esta arquitectura:
+    La Vista es el motor físico. Mueve los objetos, detecta solapamientos
+    y consulta al Model mediante llamadas explícitas:
+        - modelo.golpe_jugador_a_enemigo(i)
+        - modelo.golpe_enemigo_a_jugador()
+        - modelo.golpe_proyectil_a_jugador(p)
+        - jugador_model.notificar_en_suelo()
+        - enemigo_model.notificar_en_suelo()
+    El Model actualiza su estado interno y la Vista sigue dibujando
+    a partir del estado exportado por el Model.
+
+Nota sobre convert_alpha():
+    pygame.Surface.convert_alpha() requiere que pygame.display.set_mode()
+    ya haya sido llamado. Por eso el tileset y los fondos se cargan aquí,
+    dentro de __init__, después de crear la ventana.
+"""
 
 import pygame
 import Constantes
+from model.Enemigo2Model import Enemigo2Model
 
 from .Event              import Event
 from .Camara             import Camara
@@ -22,8 +54,26 @@ from .HitEffect          import HitEffect
 
 
 class PygameView:
+    """Gestiona física, entrada, cámara, sprites y renderizado del juego.
 
-    def __init__(self, frames_jugador, datos_enemigos, nivel_loader, datos_boss,
+    Attributes
+    ----------
+    screen : pygame.Surface
+        Superficie principal de la ventana.
+    reloj : pygame.time.Clock
+        Controla la velocidad del game loop.
+    camara : Camara
+        Gestiona el desplazamiento de la vista.
+    fondo, fondo_walls : pygame.Surface
+        Capas de fondo estáticas.
+    sprite_jugador : PersonajeSprite
+        Sprite visual y shape físico del jugador.
+    sprites_enemigos : list
+        Sprites visuales y shapes físicos de los enemigos.
+    sprites_plataformas : list of Plataforma
+        Geometría y visualización del nivel.
+    """
+    def __init__(self, frames_jugador, datos_enemigos, nivel_loader, datos_boss, audio=None,
                  frames_angel=None, datos_angel=None,
                  imagen_corazon=None, datos_corazones=None,
                  imagen_daga_pickup=None, datos_daga_pickup=None,
@@ -38,9 +88,9 @@ class PygameView:
         frames_daga_proyectil : list of pygame.Surface
             Frames del proyectil daga (Assets/Characters/Dagger/dagger.png).
         """
-        pygame.init()
+        # pygame.init() y set_mode() ya fueron llamados en main.py
+        # No volver a llamarlos aquí: reinicializarían el mixer y matarían la música.
         self.screen = pygame.display.get_surface()
-        pygame.display.set_caption("Juego de Plataformas - MVP")
 
         self.reloj  = pygame.time.Clock()
         self.camara = Camara()
@@ -55,7 +105,8 @@ class PygameView:
             "Assets/Enviorments/caverns-files-web/layers/back-walls.png"
         ).convert_alpha()
         self.fondo_walls = pygame.transform.scale(
-            fondo_walls_raw, (Constantes.WIDTH, Constantes.HEIGHT))
+            fondo_walls_raw, (Constantes.WIDTH, Constantes.HEIGHT)
+        )
 
         # --- Tileset + plataformas ---
         tileset = pygame.image.load(
@@ -88,7 +139,8 @@ class PygameView:
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
                 self.sprites_enemigos.append(
-                    Enemigo2Sprite(d['x'], d['y'], d['anim_walk']))
+                    Enemigo2Sprite(d['x'], d['y'], d['anim_walk'])
+                )
             else:
                 self.sprites_enemigos.append(
                     Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
@@ -96,6 +148,8 @@ class PygameView:
         for sprite in self.sprites_enemigos:
             if isinstance(sprite, Enemigo2Sprite):
                 sprite.proyectil_frames = frames_proyectil
+        if audio:
+            Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
 
         # --- Ángel curador ---
         pos_angel = (datos_angel['x'], datos_angel['y']) if datos_angel else (2200, 400)
@@ -134,6 +188,7 @@ class PygameView:
         self.evt_corazon_recogido       = Event()   # emite el índice
         self.evt_daga_recogida          = Event()   # sin argumentos
         self.evt_lanzar_daga            = Event()   # sin argumentos
+        self.audio = audio
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
@@ -154,22 +209,35 @@ class PygameView:
         self._boss_muerte_disparada = False
 
     # ------------------------------------------------------------------
-    # Acceso compartido con el Presenter
+    # Acceso a datos compartidos con el Presenter
     # ------------------------------------------------------------------
 
     @property
     def plataformas(self):
+        """Expone la lista de Plataforma al Presenter."""
         return self.sprites_plataformas
 
     @property
     def camara_pos(self):
+        """Devuelve la posición de la cámara como lista serializable."""
         return [self.camara.x, self.camara.y]
 
     def restaurar_camara(self, cx, cy):
+        """Restaura la posición de la cámara al cargar una partida."""
         self.camara.x = cx
         self.camara.y = cy
 
     def restaurar_pos_jugador(self, x, y):
+        """Restaura la posición física del sprite del jugador.
+
+        En esta arquitectura las posiciones viven en la Vista,
+        por eso la restauración también debe hacerse aquí.
+
+        Parameters
+        ----------
+        x, y : int
+            Centro del jugador en coordenadas de mundo.
+        """
         self.sprite_jugador.shape.center = (x, y)
         self.sprite_jugador._hitbox_ataque_cache = None
 
@@ -191,6 +259,7 @@ class PygameView:
     # ------------------------------------------------------------------
 
     def procesar_input(self, events):
+        """Procesa la lista de eventos pygame y emite los eventos MVP correspondientes."""
         for event in events:
             if event.type == pygame.QUIT:
                 self.evt_cerrar.emit()
@@ -215,6 +284,10 @@ class PygameView:
                     self.evt_lanzar_daga.emit()
                 elif event.key == pygame.K_F10:
                     self.evt_cargar.emit()
+                elif event.key == pygame.K_SPACE:
+                    self.evt_saltar.emit()
+                    # El sonido de salto se dispara desde el Presenter
+                    # NO llamar aquí para evitar doble disparo si el salto falla.
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -227,6 +300,23 @@ class PygameView:
     # ------------------------------------------------------------------
 
     def actualizar_fisica(self, modelo, delta_time_ms):
+        """Mueve todos los objetos y notifica al Model sobre cada colisión.
+
+        Secuencia por objeto:
+        1. Aplicar gravedad (acumular velocidad_y desde el Model)
+        2. Mover horizontalmente → detectar colisiones → resolver
+        3. Mover verticalmente   → detectar colisiones → resolver
+        4. Notificar al Model (en_suelo / en_aire / golpe_techo)
+        5. Avanzar IA de enemigos y mover proyectiles
+
+        Parameters
+        ----------
+        modelo : JuegoModel
+            Model principal. Se consulta para leer velocidades y
+            se notifica al detectar colisiones.
+        delta_time_ms : int
+            Milisegundos desde el último frame.
+        """
         self._mover_jugador(modelo, delta_time_ms)
         self._mover_enemigos(modelo, delta_time_ms)
         self._mover_proyectiles(modelo)
@@ -257,7 +347,7 @@ class PygameView:
                 p._x += p.vel_x
                 p._y += p.vel_y
                 p.shape.center = (int(p._x), int(p._y))
-                # Fuera de mapa: sin explosión (no se vería)
+                # Fuera de mapa: desaparecer sin explosión
                 if (p.shape.right < -2000 or p.shape.left > 8000
                         or p.shape.bottom < -1000 or p.shape.top > 1500):
                     p.vivo = False
@@ -274,8 +364,8 @@ class PygameView:
                 if p.vivo and p.shape.colliderect(self.sprite_jugador.shape):
                     p.vivo = False
                     modelo.golpe_proyectil_boss_a_jugador(p)
-            # Explosión en todos los proyectiles del boss que acaban de morir
-            for p in modelo.boss.proyectiles:
+                    self.audio.sfx_hurt_jugador()
+                # Explosión solo si acaba de morir en este frame
                 if not p.vivo and self._frames_explosion:
                     self._efectos_explosion.append(
                         ExplosionEffect(p.shape.centerx, p.shape.centery,
@@ -294,6 +384,8 @@ class PygameView:
 
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
 
+            if self.audio and modelo.boss and modelo.boss.vivo:
+                self.audio.tick_rugido_boss()
     # --- Mover proyectiles de daga del jugador ---
 
     def _mover_dagas_jugador(self, modelo):
@@ -359,10 +451,12 @@ class PygameView:
         jugador_m = modelo.jugador
         shape     = self.sprite_jugador.shape
 
+        # Aplicar gravedad
         jugador_m.velocidad_y += Constantes.GRAVEDAD
         if jugador_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
             jugador_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
+        # --- Movimiento horizontal ---
         delta_x = modelo.delta_x_jugador
         shape.x += delta_x
         for plat in self.sprites_plataformas:
@@ -370,6 +464,10 @@ class PygameView:
                 if delta_x > 0:  shape.right = plat.shape.left
                 elif delta_x < 0: shape.left  = plat.shape.right
 
+        # --- Movimiento vertical ---
+        # Se acumula en float para evitar errores de truncado con velocidades
+        # menores a 1 px/frame. El +1 fuerza solapamiento en colliderect
+        # incluso cuando la velocidad real es 0 (ver comentario en model original).
         jugador_m._y  = getattr(jugador_m, '_y', float(shape.y))
         jugador_m._y += jugador_m.velocidad_y
         shape.y        = int(jugador_m._y) + 1
@@ -390,6 +488,7 @@ class PygameView:
         if not tocando_suelo:
             jugador_m.notificar_en_aire(delta_time_ms)
 
+        # Límites de pantalla
         if shape.bottom >= Constantes.HEIGHT:
             shape.bottom  = Constantes.HEIGHT
             jugador_m._y  = float(shape.y)
@@ -398,6 +497,9 @@ class PygameView:
             shape.top    = 0
             jugador_m._y = float(shape.y)
             jugador_m.notificar_golpe_techo()
+        # Pasos (solo si está en suelo y moviéndose)
+        if self.audio and tocando_suelo and abs(modelo.delta_x_jugador) > 0:
+            self.audio.sfx_paso()
 
     # --- Movimiento de enemigos ---
 
@@ -408,15 +510,19 @@ class PygameView:
         for sprite, enemigo_m in zip(self.sprites_enemigos, modelo.enemigos):
             if not enemigo_m.vivo:
                 continue
+
             pos_enemigo = sprite.shape.center
 
             if isinstance(enemigo_m, Enemigo1Model):
+                # Enemigo terrestre: gravedad + patrulla
                 delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
 
+                # Gravedad
                 enemigo_m.velocidad_y += Constantes.GRAVEDAD
                 if enemigo_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
                     enemigo_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
+                # Horizontal
                 sprite.shape.x += delta_x
                 for plat in self.sprites_plataformas:
                     if sprite.shape.colliderect(plat.shape):
@@ -425,6 +531,7 @@ class PygameView:
                         elif delta_x < 0:
                             sprite.shape.left  = plat.shape.right; enemigo_m.flip = False
 
+                # Vertical
                 sprite.shape.y += int(enemigo_m.velocidad_y)
                 tocando_suelo = False
                 for plat in self.sprites_plataformas:
@@ -436,15 +543,19 @@ class PygameView:
                         else:
                             sprite.shape.top = plat.shape.bottom
                             enemigo_m.notificar_golpe_techo()
+
                 if not tocando_suelo:
                     enemigo_m.en_suelo = False
+
             else:
+                # Enemigo volador: solo patrulla horizontal, sin gravedad
                 delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
                 sprite.shape.x += delta_x
 
-    # --- Movimiento de proyectiles de enemigos ---
+    # --- Movimiento de proyectiles ---
 
     def _mover_proyectiles(self, modelo):
+        """Mueve los proyectiles de todos los enemigos voladores."""
         for enemigo_m in modelo.enemigos:
             if not hasattr(enemigo_m, 'proyectiles'):
                 continue
@@ -454,44 +565,61 @@ class PygameView:
                 p._x += p.vel_x
                 p._y += p.vel_y
                 p.shape.center = (int(p._x), int(p._y))
+
+                # Colisión proyectil con plataforma
                 for plat in self.sprites_plataformas:
                     if p.shape.colliderect(plat.shape):
                         p.vivo = False
                         break
-            # Explosión en los proyectiles que acaban de morir
-            for p in enemigo_m.proyectiles:
+
+                # Explosión al chocar con plataforma (antes de limpiar)
                 if not p.vivo and self._frames_explosion:
                     self._efectos_explosion.append(
                         ExplosionEffect(p.shape.centerx, p.shape.centery,
                                         self._frames_explosion))
+
+            # Limpiar proyectiles muertos
             enemigo_m.proyectiles = [p for p in enemigo_m.proyectiles if p.vivo]
 
-    # --- Detección de combate cuerpo a cuerpo ---
+    # --- Detección de combate ---
 
     def _detectar_combate(self, modelo):
+        """Comprueba solapamientos de hitboxes y notifica al Model."""
         jugador_m     = modelo.jugador
         shape_jugador = self.sprite_jugador.shape
 
+        # Hitbox de ataque del jugador (calculada en la Vista a partir del shape)
         hitbox_jugador = None
         if jugador_m.atacando:
-            hitbox_jugador = self._calcular_hitbox_ataque_jugador(
-                shape_jugador, jugador_m.flip)
+            hitbox_jugador = self._calcular_hitbox_ataque_jugador(shape_jugador, jugador_m.flip)
 
         for i, (sprite, enemigo_m) in enumerate(
             zip(self.sprites_enemigos, modelo.enemigos)
         ):
             if not enemigo_m.vivo:
                 continue
+
+            # Jugador golpea al enemigo
             if hitbox_jugador and hitbox_jugador.colliderect(sprite.shape):
                 modelo.golpe_jugador_a_enemigo(i)
+
+            # Enemigo golpea al jugador
             if (enemigo_m.hitbox_ataque
                     and enemigo_m.hitbox_ataque.colliderect(shape_jugador)):
                 modelo.golpe_enemigo_a_jugador()
+                self.audio.sfx_hurt_jugador()
+
+
+            # Proyectiles del enemigo
             if hasattr(enemigo_m, 'proyectiles'):
                 for p in enemigo_m.proyectiles:
-                    if not p.vivo: continue
+                    if not p.vivo:
+                        continue
+                    # Proyectil toca al jugador
                     if p.shape.colliderect(shape_jugador):
                         modelo.golpe_proyectil_a_jugador(p)
+                        self.audio.sfx_hurt_jugador()
+                    # Jugador destruye el proyectil con la espada
                     elif hitbox_jugador and hitbox_jugador.colliderect(p.shape):
                         if self._frames_explosion:
                             self._efectos_explosion.append(
@@ -499,9 +627,11 @@ class PygameView:
                                                 self._frames_explosion))
                         modelo.golpe_jugador_a_proyectil(p)
 
+        # Actualizar hitbox de ataque en el Model para que la Vista la dibuje
         self.sprite_jugador._hitbox_ataque_cache = hitbox_jugador
 
     def _calcular_hitbox_ataque_jugador(self, shape, flip):
+        """Devuelve la hitbox de ataque del jugador según su posición y dirección."""
         ancho_hit = Constantes.WIDTH_PERSONAJE * 3
         x = shape.left - ancho_hit if flip else shape.right
         return pygame.Rect(x, shape.top, ancho_hit, shape.height)
@@ -511,12 +641,26 @@ class PygameView:
     # ------------------------------------------------------------------
 
     def renderizar(self, estado_jugador, estados_enemigos, modelo=None):
+        """Sincroniza sprites con el estado del Model y dibuja el frame completo.
+
+        Parameters
+        ----------
+        estado_jugador : dict
+            Estado lógico del jugador exportado por el Model.
+        estados_enemigos : list of dict
+            Estados lógicos de los enemigos vivos.
+        modelo : JuegoModel, optional
+            Necesario para renderizar el boss si existe.
+        """
+        # 1. Sincronizar jugador con su estado lógico y actualizar cámara
         self.sprite_jugador.sincronizar(estado_jugador)
         self.camara.update(self.sprite_jugador.shape)
 
+        # 2. Fondos estáticos
         self.screen.blit(self.fondo, (0, 0))
         self.screen.blit(self.fondo_walls, (0, 0))
 
+        # 3. Plataformas
         for plat in self.sprites_plataformas:
             plat.draw(self.screen, self.camara)
 
@@ -580,29 +724,41 @@ class PygameView:
         # Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
 
-        # HUD
+        # 6. HUD
         self.dibujar_hud(estado_jugador)
 
+        # 7. Presentar frame
         pygame.display.flip()
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     def obtener_estado_jugador(self, modelo):
+        """Construye el dict de estado del jugador combinando Model y Vista.
+
+        El Model conoce flags lógicos; la Vista conoce la posición real.
+
+        Parameters
+        ----------
+        modelo : JuegoModel
+
+        Returns
+        -------
+        dict
+        """
         hitbox = getattr(self.sprite_jugador, '_hitbox_ataque_cache', None)
         return modelo.jugador.obtener_estado(
             pos=self.sprite_jugador.shape.center,
-            hitbox_ataque=hitbox)
+            hitbox_ataque=hitbox,
+        )
 
     def obtener_estados_enemigos(self, modelo):
         return [em.obtener_estado(pos=s.shape.center)
                 for s, em in zip(self.sprites_enemigos, modelo.enemigos)]
 
     def refrescar(self):
+        """Limita el loop a FPS y devuelve delta_time en milisegundos."""
         return self.reloj.tick(Constantes.FPS)
 
     def eliminar_sprite_enemigo(self, indice):
+        """Elimina el sprite de un enemigo muerto de la lista."""
         if 0 <= indice < len(self.sprites_enemigos):
             sprite = self.sprites_enemigos[indice]
             # Disparar efecto de sangre en la posición del enemigo muerto

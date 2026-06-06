@@ -9,6 +9,7 @@ from presenter     import JuegoPresenter
 from Nivel         import cargar_nivel_1
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
+from view.AudioManager import AudioManager
 
 
 def escalar_img(image, scale):
@@ -20,28 +21,36 @@ def cargar_frames(patron, n, scale):
     frames = []
     for i in range(1, n + 1):
         img = pygame.image.load(patron.format(i))
-        frames.append(escalar_img(img, scale))
+        img = escalar_img(img, scale)
+        frames.append(img)
     return frames
 
 
-def iniciar_partida(cargar_save=False):
+def iniciar_partida(audio, cargar_save=False):  # <-- audio recibido como parámetro
+    """Carga assets, compone MVP e inicia el game loop. Devuelve el presenter."""
     s = Constantes.SCALA_PERSONAJE
 
+    # Calcular dimensiones del personaje antes de crear la ventana.
+    # image.load sin convert_alpha() es seguro antes de set_mode().
     _img_ref = pygame.image.load(
-        "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png")
+        "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png"
+    )
     Constantes.WIDTH_PERSONAJE  = int(_img_ref.get_width()  * 0.1  * s)
     Constantes.HEIGHT_PERSONAJE = int(_img_ref.get_height() * 0.35 * s)
 
-    # --- Animaciones jugador ---
     frames_jugador = {
-        'Parado':      cargar_frames("Assets/Characters/Terrible Knight/Sprites/Idle/frame{}.png", 4, s),
-        'Andando':     cargar_frames("Assets/Characters/Terrible Knight/Sprites/Run/frame{}.png", 12, s),
-        'Saltando':    cargar_frames("Assets/Characters/Terrible Knight/Sprites/Jump/Jump{}.png", 4, s),
-        'AtaqueParado':cargar_frames("Assets/Characters/Terrible Knight/Sprites/SwordSlash/frame{}.png", 4, s),
-        'AtaqueSalto': cargar_frames("Assets/Characters/Terrible Knight/Sprites/AirSwordSlash/AirSwordSlash-export{}.png", 6, s),
+        'Parado': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/Idle/frame{}.png", 4, s),
+        'Andando': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/Run/frame{}.png", 12, s),
+        'Saltando': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/Jump/Jump{}.png", 4, s),
+        'AtaqueParado': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/SwordSlash/frame{}.png", 4, s),
+        'AtaqueSalto': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/AirSwordSlash/AirSwordSlash-export{}.png", 6, s),
     }
 
-    # --- Animaciones enemigos ---
     anim_ogre_walk    = cargar_frames("Assets/Characters/Ogre/Sprites/walk/ogre-walk{}.png", 6, s)
     anim_ogre_attack  = cargar_frames("Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
     anim_volador_walk = cargar_frames("Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
@@ -99,6 +108,7 @@ def iniciar_partida(cargar_save=False):
         datos_enemigos        = datos_enemigos,
         nivel_loader          = cargar_nivel_1,
         datos_boss            = datos_boss,
+        audio                 = audio,          # <-- ya definido
         frames_angel          = frames_angel,
         datos_angel           = datos_angel,
         imagen_corazon        = img_corazon,
@@ -110,7 +120,15 @@ def iniciar_partida(cargar_save=False):
 
     presenter = JuegoPresenter(
         vista, modelo,
-        num_frames_ataque_jugador=len(frames_jugador['AtaqueParado']))
+        num_frames_ataque_jugador=len(frames_jugador['AtaqueParado']),
+        audio=audio,
+    )
+
+    # Arrancar música DESPUÉS de crear PygameView (que llama convert_alpha,
+    # lo cual requiere que set_mode ya haya sido invocado).
+    # Si ya suena algo (partida anterior), no reiniciar.
+    if audio and not pygame.mixer.music.get_busy():
+        audio.reproducir_musica("Assets/Audio/Music/Ambient_Lingering_Action.wav")
 
     if cargar_save:
         presenter._cargar_partida()
@@ -120,9 +138,14 @@ def iniciar_partida(cargar_save=False):
 
 
 def main():
+    # pre_init DEBE ir antes de pygame.init() para que el mixer use los parámetros correctos
+    pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
     pygame.init()
+    pygame.mixer.init()
     pygame.display.set_mode((Constantes.WIDTH, Constantes.HEIGHT), pygame.DOUBLEBUF)
     pygame.display.set_caption("Cavern Quest")
+
+    audio = AudioManager()  # creado aquí, una sola vez; música se arranca en iniciar_partida
 
     save_manager = SaveManager()
 
@@ -134,10 +157,10 @@ def main():
         if accion == 'salir':
             break
         elif accion == 'jugar':
-            presenter = iniciar_partida(cargar_save=False)
+            presenter = iniciar_partida(audio, cargar_save=False)  # <-- pasado
             if presenter.salida_forzada: break
         elif accion == 'cargar':
-            presenter = iniciar_partida(cargar_save=True)
+            presenter = iniciar_partida(audio, cargar_save=True)   # <-- pasado
             if presenter.salida_forzada: break
 
     pygame.quit()

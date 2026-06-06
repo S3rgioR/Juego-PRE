@@ -76,7 +76,9 @@ class ProyectilBoss(ProyectilModel):
 
 class BossModel(Actor):
 
-    HP_MAX = 26
+    on_disparo = staticmethod(lambda: None)  # sobreescrito por el Presenter si hay audio
+
+    HP_MAX = 2
 
     # Distancias / velocidades
     DIST_ATAQUE       = 350   # px horizontal para empezar a atacar
@@ -388,17 +390,20 @@ class BossModel(Actor):
             self._rayo_pendiente = self.RAYO_NUM
             self._rayo_timer     = 0
             self._rayo_target    = (jx, jy)
+            self.on_disparo()
 
         elif estado == 'atacar_x':
             nuevos = self._lanzar_x(self._x, self._y, jx, jy)
             self.proyectiles.extend(nuevos)
             # Transición inmediata a descanso (los proyectiles ya están creados)
             self._t_x = ahora
+            self.on_disparo()
 
         elif estado == 'atacar_mas':
             nuevos = self._lanzar_mas(self._x, self._y, jx, jy)
             self.proyectiles.extend(nuevos)
             self._t_mas = ahora
+            self.on_disparo()
 
         elif estado == 'atacar_tracking':
 

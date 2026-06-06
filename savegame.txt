@@ -1,16 +1,15 @@
 {
-  "hp": 3.0,
-  "hp_max": 6,
+  "hp": 5,
+  "hp_max": 5,
+  "num_enemigos_vivos": 3,
   "pos": [
-    474,
+    469,
     631
   ],
   "camara": [
-    24.857727781155848,
-    83.48348817715924
+    21.000878918778824,
+    90.99999999999996
   ],
-  "corazones_recogidos": [
-    0
-  ],
-  "daga_recogida": true
+  "corazones_recogidos": [],
+  "daga_recogida": false
 }

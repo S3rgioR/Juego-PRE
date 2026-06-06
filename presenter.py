@@ -1,32 +1,74 @@
-"""Capa Presenter del patrón MVP."""
+"""Capa Presenter del patrón MVP - Coordinación del flujo del juego.
+
+El Presenter es el intermediario entre Model y View:
+1. Se suscribe a todos los eventos de la Vista (teclado, cierre)
+2. Llama al Model para registrar las intenciones del jugador
+3. Coordina el game loop: input → física → tick Model → render
+
+Flujo por frame en ejecutar():
+1. Vista procesa input → emite eventos → Presenter actualiza banderas en Model
+2. Vista ejecuta la física: mueve objetos, detecta colisiones, notifica al Model
+3. Model avanza sus contadores internos (iframes, fin de ataque, IA)
+4. Presenter elimina sprites de enemigos muertos de la Vista
+5. Vista renderiza usando el estado combinado Model + posiciones de la Vista
+"""
 
 from SaveManager import SaveManager
 from MenuPausa   import MenuPausa
+from model import BossModel
+from model.Enemigo1Model import Enemigo1Model
 
 
 class JuegoPresenter:
+    """Coordinador central que conecta Model y View.
 
-    def __init__(self, vista, modelo, num_frames_ataque_jugador=4):
+    Attributes
+    ----------
+    vista : PygameView
+        Referencia a la capa View.
+    modelo : JuegoModel
+        Referencia a la capa Model.
+    ejecutando : bool
+        Controla si el game loop sigue activo.
+    _num_frames_ataque_jugador : int
+        Número de frames de la animación de ataque del jugador.
+    """
+
+    def __init__(self, vista, modelo, num_frames_ataque_jugador=4, audio=None):
+
         self.vista      = vista
+        self.audio = audio
+        if audio:
+            self.vista.evt_saltar.add_listener(audio.sfx_salto)
+            self.vista.evt_atacar.add_listener(audio.sfx_ataque_jugador)
+        if audio:
+            Enemigo1Model.on_ataque = audio.sfx_ataque_ogro
+        if audio:
+            BossModel.on_disparo = audio.sfx_ataque_boss
         self.modelo     = modelo
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
-        self.save_manager   = SaveManager()
-        self._pausado       = False
-        self._menu_pausa    = None
-        self.salida_forzada = False
+        self.save_manager = SaveManager()
+        self._pausado     = False
+        self._menu_pausa  = None   # se crea al pausar (así tiene el save actualizado)
+        self.salida_forzada = False  # True si el usuario cerró la ventana con la X
 
-        # --- Suscripción a eventos ---
+        # --- Suscripción a eventos de la Vista ---
         self.vista.evt_cerrar.add_listener(self._cerrar)
         self.vista.evt_pausa.add_listener(self._togglear_pausa)
+
         self.vista.evt_mover_derecha_inicio.add_listener(
-            self.modelo.jugador_mover_derecha_inicio)
+            self.modelo.jugador_mover_derecha_inicio
+        )
         self.vista.evt_mover_derecha_fin.add_listener(
-            self.modelo.jugador_mover_derecha_fin)
+            self.modelo.jugador_mover_derecha_fin
+        )
         self.vista.evt_mover_izquierda_inicio.add_listener(
-            self.modelo.jugador_mover_izquierda_inicio)
+            self.modelo.jugador_mover_izquierda_inicio
+        )
         self.vista.evt_mover_izquierda_fin.add_listener(
-            self.modelo.jugador_mover_izquierda_fin)
+            self.modelo.jugador_mover_izquierda_fin
+        )
         self.vista.evt_saltar.add_listener(self._saltar)
         self.vista.evt_atacar.add_listener(self._atacar)
         self.vista.evt_guardar.add_listener(self._guardar_partida)
@@ -36,7 +78,7 @@ class JuegoPresenter:
         self.vista.evt_daga_recogida.add_listener(self._daga_recogida)
         self.vista.evt_lanzar_daga.add_listener(self._lanzar_daga)
 
-    # --- Handlers ---
+    # --- Handlers de eventos ---
 
     def _cerrar(self):
         self.ejecutando     = False
@@ -95,6 +137,7 @@ class JuegoPresenter:
         return bool(self.vista._frames_daga_proyectil)
 
     def _guardar_partida(self):
+        """Guarda posición (de la Vista), hp (del Model) y cámara."""
         try:
             estado = self.modelo.obtener_estado_guardado()
             estado['pos']                 = list(self.vista.sprite_jugador.shape.center)
@@ -112,6 +155,7 @@ class JuegoPresenter:
             print(f"[Presenter] ✗ Error al guardar: {e}")
 
     def _cargar_partida(self):
+        """Carga y restaura posición (en Vista), hp (en Model) y cámara."""
         try:
             datos = self.save_manager.cargar()
             if datos is None:
@@ -136,7 +180,7 @@ class JuegoPresenter:
                 if self.vista.sprite_daga_pickup:
                     self.vista.sprite_daga_pickup.recogida = False
 
-            self.vista.sprite_checkpoint.activado = True
+            self.vista.sprite_checkpoint.activar()
             print("[Presenter] ✓ Partida cargada")
         except Exception as e:
             print(f"[Presenter] ✗ Error al cargar: {e}")
@@ -144,26 +188,71 @@ class JuegoPresenter:
     # --- Game loop ---
 
     def ejecutar(self):
+        """Bucle principal del juego.
+
+        Secuencia por frame:
+        1. Vista procesa input → eventos → handlers actualizan el Model
+        2. Vista ejecuta la física y notifica al Model sobre colisiones
+        3. Model avanza iframes, animación de ataque e IA
+        4. Presenter elimina sprites de enemigos muertos
+        5. Vista renderiza usando el estado exportado por Model y Vista
+        """
         import pygame
-        reloj = pygame.time.Clock()
 
         while self.ejecutando:
             events = pygame.event.get()
 
             if self._pausado:
-                reloj.tick(60)
+                self.vista.refrescar()   # limita FPS también en pausa
                 self._procesar_pausa(events)
                 continue
+
+            # Eventos diferidos de muerte del boss
+            for event in events:
+                if event.type == pygame.USEREVENT + 2:
+                    # Rugido de muerte: suena 1.5 s después de morir el boss
+                    if self.audio:
+                        self.audio.sfx_muerte_boss()
+                    # 900 ms después del rugido, cambiar la música
+                    pygame.time.set_timer(pygame.USEREVENT + 1, 0, loops=1)
+                if event.type == pygame.USEREVENT + 1:
+                    if self.audio:
+                        self.audio.reproducir_musica("Assets/Audio/Music/Ambient_Lingering_Action.wav")
 
             self.vista.procesar_input(events)
 
             if self.modelo.jugador.vivo:
+                # 2. Delta time
                 delta_time = self.vista.refrescar()
+
+                # 3. Vista: mover objetos + detectar colisiones + notificar Model
                 self.vista.actualizar_fisica(self.modelo, delta_time)
+
+                # 4. Model: avanzar contadores internos
                 muertos = self.modelo.tick(delta_time)
-                for i in reversed(muertos):
+                # muertos es lista de (indice, tipo) — el Model ya los eliminó
+                for i, tipo in reversed(muertos):
+                    if self.audio:
+                        self.audio.sfx_muerte_enemigo(tipo)
+
+                # Muerte del boss (fuera del bucle de enemigos)
+                if (self.audio and self.modelo.boss
+                        and not self.modelo.boss.vivo
+                        and not getattr(self, '_boss_muerto_sonado', False)):
+                    self._boss_muerto_sonado = True
+                    # Rugido diferido 3 s; la música cambia 900 ms después del rugido
+                    pygame.time.set_timer(pygame.USEREVENT + 2, 1500, loops=1)
+
+                # 5. Eliminar sprites de enemigos muertos
+                for i, _ in reversed(muertos):
                     self.vista.eliminar_sprite_enemigo(i)
 
+            else:
+                # Jugador muerto: limitar FPS igualmente para no saturar la CPU
+                self.vista.refrescar()
+
+            # 6. Renderizar
             estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
             estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
             self.vista.renderizar(estado_jugador, estados_enemigos, self.modelo)
+
