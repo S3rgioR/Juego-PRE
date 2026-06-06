@@ -1,22 +1,83 @@
-"""Cargador de niveles.
+"""Definiciones de niveles del juego.
 
-Construye la lista de objetos Plataforma que define la geometría del nivel.
-Cada Plataforma contiene tanto el shape (pygame.Rect, usado por el Model
-para colisiones) como la superficie visual (usada por la Vista para dibujar).
+Cada nivel expone:
+  - cargar_nivel_N(tileset)  → list[Plataforma]   (terreno leído del .txt)
+  - DATOS_NIVEL_N            → dict con entidades, checkpoint, música, etc.
 
-Vive fuera de view/ porque lo necesitan tanto el Model (para colisiones)
-como la Vista (para dibujar), y el Presenter lo pasa a ambos.
+El terreno se construye leyendo un archivo .txt mediante LevelParser.
+Las entidades (enemigos, boss, objetos) se definen aquí en Python porque
+necesitan referencias a assets (frames de animación) que se cargan en main.py
+y se pasan como parámetros al construir la Vista.
+
+Añadir un nivel nuevo:
+  1. Crear  levels/nivel2.txt  con los vértices del terreno.
+  2. Definir DATOS_NIVEL_2 con sus entidades.
+  3. Definir cargar_nivel_2(tileset) que llame a LevelParser.
+  4. Registrar el nivel en NIVELES (al final de este archivo).
 """
 
-# Posición del checkpoint en el nivel 1 (centro, coordenadas de mundo).
-CHECKPOINT_NIVEL_1 = (500, 620)
-
 import pygame
-from view.Plataforma import Plataforma
+from LevelParser import LevelParser
 
 
-def cargar_nivel_1(tileset):
-    """Construye y devuelve la lista de plataformas del nivel 1.
+# ===========================================================================
+# NIVEL 1
+# ===========================================================================
+
+CHECKPOINT_NIVEL_1 = (500, 620)   # coordenadas de mundo del checkpoint
+
+# Entidades del nivel 1.
+# Los frames de animación (listas de pygame.Surface) se inyectan en main.py
+# después de cargar los assets; aquí solo se definen posición y parámetros.
+DATOS_NIVEL_1 = {
+    'checkpoint': CHECKPOINT_NIVEL_1,
+    'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
+
+    'enemigos': [
+        {
+            'tipo':                 'terrestre',
+            'x':                    600,
+            'y':                    400,
+            'distancia_patrulla':   2000,
+            'num_frames_ataque':    6,
+            # 'anim_walk' y 'anim_attack' se inyectan desde main.py
+        },
+        {
+            'tipo':                 'terrestre',
+            'x':                    1500,
+            'y':                    400,
+            'distancia_patrulla':   10000,
+            'num_frames_ataque':    6,
+        },
+        {
+            'tipo':                 'volador',
+            'x':                    1000,
+            'y':                    400,
+            'distancia_patrulla':   300,
+        },
+    ],
+
+    'boss': {
+        'tipo': 'boss',
+        'x':    3050,
+        'y':    400,
+        # 'anim_fase1' y 'anim_fase2' se inyectan desde main.py
+    },
+
+    'angel': {'x': 0, 'y': 540},
+
+    'corazones': [
+        {'x': 900,  'y': 560},
+        {'x': 1800, 'y': 528},
+        {'x': 2600, 'y': 640},
+    ],
+
+    'daga_pickup': {'x': 1200, 'y': 620},
+}
+
+
+def cargar_nivel_1(tileset: pygame.Surface) -> list:
+    """Construye y devuelve las plataformas del nivel 1 desde su .txt.
 
     Parameters
     ----------
@@ -26,51 +87,52 @@ def cargar_nivel_1(tileset):
     Returns
     -------
     list of Plataforma
-        Lista ordenada de plataformas que forman el nivel.
     """
-    plataformas = []
+    return LevelParser(tileset).cargar('levels/nivel1.txt')
 
-    # --- Definición de tiles dentro del tileset ---
-    tile_tierra    = pygame.Rect(0,   0,  16, 16)   # Superficie pisable
-    tile_suelo     = pygame.Rect(0,   16, 16, 16)   # Relleno oscuro
 
-    tile_pared_iz  = pygame.Rect(128, 16, 16, 16)
-    tile_pared_der = pygame.Rect(48,  16, 16, 16)
+# ===========================================================================
+# NIVEL 2  (plantilla — personaliza el .txt y las entidades)
+# ===========================================================================
 
-    tile_union_iz  = pygame.Rect(128, 48, 16, 16)
-    tile_union_der = pygame.Rect(48,  48, 16, 16)
+DATOS_NIVEL_2 = {
+    'checkpoint': (400, 600),
+    'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
 
-    tile_final_iz  = pygame.Rect(128, 0,  16, 16)
-    tile_final_der = pygame.Rect(48,  0,  16, 16)
+    'enemigos': [
+        {
+            'tipo':               'terrestre',
+            'x':                  500,
+            'y':                  400,
+            'distancia_patrulla': 300,
+            'num_frames_ataque':  6,
+        },
+        {
+            'tipo':               'volador',
+            'x':                  900,
+            'y':                  350,
+            'distancia_patrulla': 400,
+        },
+    ],
 
-    # --- Suelo principal ---
-    ysuelo = 656
-    plataformas.append(Plataforma(-1000, ysuelo,      20000, 16,  tileset, tile_tierra))
-    plataformas.append(Plataforma(-1000, ysuelo + 16, 20000, 160, tileset, tile_suelo))
+    'boss': None,   # sin boss en el nivel 2
 
-    def crear_plataforma(tileset, x, y, ancho):
-        """Añade una plataforma elevada con bordes y paredes laterales."""
-        alto = ysuelo - y
+    'angel':       {'x': 0, 'y': 540},
+    'corazones':   [{'x': 700, 'y': 560}],
+    'daga_pickup': None,   # sin daga en el nivel 2
+}
 
-        # Superficie superior
-        plataformas.append(Plataforma(x,        y,       ancho, 16,          tileset, tile_tierra))
-        # Relleno vertical
-        plataformas.append(Plataforma(x - 16,   y + 16,  ancho, alto + 16,   tileset, tile_suelo))
 
-        # Esquinas superiores
-        plataformas.append(Plataforma(x - 16,         y, 16, 16, tileset, tile_final_der))
-        plataformas.append(Plataforma(x + ancho - 16, y, 16, 16, tileset, tile_final_iz))
+def cargar_nivel_2(tileset: pygame.Surface) -> list:
+    """Construye y devuelve las plataformas del nivel 2 desde su .txt."""
+    return LevelParser(tileset).cargar('levels/nivel2.txt')
 
-        # Paredes laterales
-        plataformas.append(Plataforma(x - 16,         y + 16, 16, ysuelo - y, tileset, tile_pared_der))
-        plataformas.append(Plataforma(x + ancho - 16, y + 16, 16, ysuelo - y, tileset, tile_pared_iz))
 
-        # Esquinas inferiores (unión con el suelo)
-        plataformas.append(Plataforma(x - 16,         y + alto, 16, 16, tileset, tile_union_der))
-        plataformas.append(Plataforma(x + ancho - 16, y + alto, 16, 16, tileset, tile_union_iz))
-
-    crear_plataforma(tileset, 160,  608, 200)
-    crear_plataforma(tileset, 800,  560, 200)
-    crear_plataforma(tileset, 1500, 528, 300)
-
-    return plataformas
+# ===========================================================================
+# Registro de niveles
+# ===========================================================================
+# Añade aquí cada nivel nuevo: (función_loader, dict_datos)
+NIVELES = {
+    1: (cargar_nivel_1, DATOS_NIVEL_1),
+    2: (cargar_nivel_2, DATOS_NIVEL_2),
+}

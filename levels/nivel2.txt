@@ -1,0 +1,37 @@
+# Nivel 2 — Terreno
+#
+# Suelo con más desniveles que el nivel 1.
+# Añade o mueve vértices para ajustar la forma.
+
+# Inicio
+-1000 656
+
+# Primer desnivel: subida pronunciada
+300 656   300 580
+
+# Tramo alto
+300 580   600 580
+
+# Bajada al suelo
+600 580   600 656
+
+# Tramo plano
+600 656   900 656
+
+# Segunda subida (más alta)
+900 656   900 520
+
+# Techo largo
+900 520   1300 520
+
+# Bajada escalonada: tramo medio
+1300 520   1300 580
+
+# Tramo medio
+1300 580   1600 580
+
+# Bajada al suelo
+1600 580   1600 656
+
+# Suelo hasta el final
+1600 656   20000 656

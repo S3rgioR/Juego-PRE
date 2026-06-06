@@ -6,7 +6,7 @@ import Constantes
 from model         import JuegoModel
 from view          import PygameView
 from presenter     import JuegoPresenter
-from Nivel         import cargar_nivel_1
+from Nivel         import NIVELES
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
 from view.AudioManager import AudioManager
@@ -26,18 +26,60 @@ def cargar_frames(patron, n, scale):
     return frames
 
 
-def iniciar_partida(audio, cargar_save=False):  # <-- audio recibido como parámetro
-    """Carga assets, compone MVP e inicia el game loop. Devuelve el presenter."""
+def _inyectar_anims(datos_nivel, anim_ogre_walk, anim_ogre_attack,
+                    anim_volador_walk, anim_boss_nofiro, anim_boss_fire):
+    """Inyecta los frames de animación en los dicts de entidades del nivel.
+
+    Los .txt y DATOS_NIVEL solo guardan posiciones y parámetros numéricos;
+    los assets (listas de Surface) se añaden aquí tras cargarlos.
+    Modifica los dicts en-place y devuelve datos_enemigos y datos_boss listos.
+    """
+    datos_enemigos = []
+    for d in datos_nivel['enemigos']:
+        e = dict(d)   # copia para no mutar el original
+        if e['tipo'] == 'terrestre':
+            e.setdefault('anim_walk',   anim_ogre_walk)
+            e.setdefault('anim_attack', anim_ogre_attack)
+        elif e['tipo'] == 'volador':
+            e.setdefault('anim_walk', anim_volador_walk)
+        datos_enemigos.append(e)
+
+    datos_boss = None
+    if datos_nivel.get('boss'):
+        datos_boss = dict(datos_nivel['boss'])
+        datos_boss.setdefault('anim_fase1', anim_boss_nofiro)
+        datos_boss.setdefault('anim_fase2', anim_boss_fire)
+
+    return datos_enemigos, datos_boss
+
+
+def iniciar_partida(audio, num_nivel=1, cargar_save=False):
+    """Carga assets, compone MVP e inicia el game loop. Devuelve el presenter.
+
+    Parameters
+    ----------
+    audio : AudioManager
+    num_nivel : int
+        Número del nivel a cargar (debe existir en NIVELES).
+    cargar_save : bool
+        Si True, restaura la partida guardada al arrancar.
+    """
+    if num_nivel not in NIVELES:
+        print(f"[main] ⚠ Nivel {num_nivel} no existe. Cargando nivel 1.")
+        num_nivel = 1
+
+    nivel_loader, datos_nivel = NIVELES[num_nivel]
+
     s = Constantes.SCALA_PERSONAJE
 
-    # Calcular dimensiones del personaje antes de crear la ventana.
-    # image.load sin convert_alpha() es seguro antes de set_mode().
+    # --- Dimensiones del personaje (antes de set_mode) ---
     _img_ref = pygame.image.load(
         "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png"
     )
     Constantes.WIDTH_PERSONAJE  = int(_img_ref.get_width()  * 0.1  * s)
     Constantes.HEIGHT_PERSONAJE = int(_img_ref.get_height() * 0.35 * s)
 
+    # --- Assets del jugador ---
     frames_jugador = {
         'Parado': cargar_frames(
             "Assets/Characters/Terrible Knight/Sprites/Idle/frame{}.png", 4, s),
@@ -51,52 +93,39 @@ def iniciar_partida(audio, cargar_save=False):  # <-- audio recibido como parám
             "Assets/Characters/Terrible Knight/Sprites/AirSwordSlash/AirSwordSlash-export{}.png", 6, s),
     }
 
+    # --- Assets de enemigos ---
     anim_ogre_walk    = cargar_frames("Assets/Characters/Ogre/Sprites/walk/ogre-walk{}.png", 6, s)
     anim_ogre_attack  = cargar_frames("Assets/Characters/Ogre/Sprites/Attack/ogre-attack{}.png", 6, s)
     anim_volador_walk = cargar_frames("Assets/Characters/Ghost/Sprites/ghost-{}.png", 4, s)
 
-    # --- Animaciones boss ---
+    # --- Assets del boss ---
     anim_boss_nofiro = cargar_frames("Assets/Characters/Fire-Skull-Files/Sprites/NoFire/frame{}.png", 4, s)
     anim_boss_fire   = cargar_frames("Assets/Characters/Fire-Skull-Files/Sprites/Fire/frame{}.png", 8, s)
 
-    # --- Ángel ---
+    # --- Assets compartidos ---
     frames_angel = cargar_frames("Assets/Characters/angel/sprites/angel{}.png", 8, s)
 
-    # --- Corazón ---
     img_corazon = escalar_img(
         pygame.image.load("Assets/Characters/Vida.png").convert_alpha(), s * 0.8)
 
-    # --- Objeto daga (pickup en el suelo) ---
     img_daga_pickup = escalar_img(
         pygame.image.load("Assets/Characters/Daga.png").convert_alpha(), s * 0.8)
 
-    # --- Proyectil daga (un único frame; añade más si tienes animación) ---
     img_daga_proj = escalar_img(
-        pygame.image.load("Assets/Characters/Dagger/dagger.png").convert_alpha(),
-        s * 0.6)
+        pygame.image.load("Assets/Characters/Dagger/dagger.png").convert_alpha(), s * 0.6)
     frames_daga_proyectil = [img_daga_proj]
 
-    # --- Datos de nivel ---
-    datos_enemigos = [
-        {'tipo': 'terrestre', 'x': 600,  'y': 400, 'distancia_patrulla': 2000,
-         'num_frames_ataque': 6, 'anim_walk': anim_ogre_walk, 'anim_attack': anim_ogre_attack},
-        {'tipo': 'terrestre', 'x': 1500, 'y': 400, 'distancia_patrulla': 10000,
-         'num_frames_ataque': 6, 'anim_walk': anim_ogre_walk, 'anim_attack': anim_ogre_attack},
-        {'tipo': 'volador',   'x': 1000, 'y': 400, 'distancia_patrulla': 300,
-         'anim_walk': anim_volador_walk},
-    ]
-    datos_boss  = {'tipo': 'boss', 'x': 3050, 'y': 400,
-                   'anim_fase1': anim_boss_nofiro, 'anim_fase2': anim_boss_fire}
-    datos_angel = {'x': 0, 'y': 540}
+    # --- Inyectar animaciones en los datos del nivel ---
+    datos_enemigos, datos_boss = _inyectar_anims(
+        datos_nivel,
+        anim_ogre_walk, anim_ogre_attack,
+        anim_volador_walk,
+        anim_boss_nofiro, anim_boss_fire,
+    )
 
-    datos_corazones = [
-        {'x': 900,  'y': 560},
-        {'x': 1800, 'y': 528},
-        {'x': 2600, 'y': 640},
-    ]
-
-    # Posición del objeto daga en el mapa (ajusta a tu nivel)
-    datos_daga_pickup = {'x': 1200, 'y': 620}
+    datos_angel      = datos_nivel.get('angel',      {'x': 0, 'y': 540})
+    datos_corazones  = datos_nivel.get('corazones',  [])
+    datos_daga_pickup = datos_nivel.get('daga_pickup', None)
 
     # ---------------------------------------------------------------------------
     # Composición MVP
@@ -106,9 +135,9 @@ def iniciar_partida(audio, cargar_save=False):  # <-- audio recibido como parám
     vista = PygameView(
         frames_jugador        = frames_jugador,
         datos_enemigos        = datos_enemigos,
-        nivel_loader          = cargar_nivel_1,
+        nivel_loader          = nivel_loader,
         datos_boss            = datos_boss,
-        audio                 = audio,          # <-- ya definido
+        audio                 = audio,
         frames_angel          = frames_angel,
         datos_angel           = datos_angel,
         imagen_corazon        = img_corazon,
@@ -124,11 +153,10 @@ def iniciar_partida(audio, cargar_save=False):  # <-- audio recibido como parám
         audio=audio,
     )
 
-    # Arrancar música DESPUÉS de crear PygameView (que llama convert_alpha,
-    # lo cual requiere que set_mode ya haya sido invocado).
-    # Si ya suena algo (partida anterior), no reiniciar.
+    # Arrancar música del nivel (si no hay ya música sonando)
+    musica = datos_nivel.get('musica', 'Assets/Audio/Music/Ambient_Lingering_Action.wav')
     if audio and not pygame.mixer.music.get_busy():
-        audio.reproducir_musica("Assets/Audio/Music/Ambient_Lingering_Action.wav")
+        audio.reproducir_musica(musica)
 
     if cargar_save:
         presenter._cargar_partida()
@@ -138,15 +166,13 @@ def iniciar_partida(audio, cargar_save=False):  # <-- audio recibido como parám
 
 
 def main():
-    # pre_init DEBE ir antes de pygame.init() para que el mixer use los parámetros correctos
     pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
     pygame.init()
     pygame.mixer.init()
     pygame.display.set_mode((Constantes.WIDTH, Constantes.HEIGHT), pygame.DOUBLEBUF)
     pygame.display.set_caption("Cavern Quest")
 
-    audio = AudioManager()  # creado aquí, una sola vez; música se arranca en iniciar_partida
-
+    audio        = AudioManager()
     save_manager = SaveManager()
 
     while True:
@@ -157,10 +183,10 @@ def main():
         if accion == 'salir':
             break
         elif accion == 'jugar':
-            presenter = iniciar_partida(audio, cargar_save=False)  # <-- pasado
+            presenter = iniciar_partida(audio, num_nivel=1, cargar_save=False)
             if presenter.salida_forzada: break
         elif accion == 'cargar':
-            presenter = iniciar_partida(audio, cargar_save=True)   # <-- pasado
+            presenter = iniciar_partida(audio, num_nivel=1, cargar_save=True)
             if presenter.salida_forzada: break
 
     pygame.quit()
