@@ -33,16 +33,24 @@ Nota sobre convert_alpha():
 
 import pygame
 import Constantes
+from model.Enemigo2Model import Enemigo2Model
 
-from .Event     import Event
-from .Camara    import Camara
-from .Personaje import PersonajeSprite
-from .Enemigo_1 import Enemigo1Sprite
-from .Enemigo_2 import Enemigo2Sprite
-from .Plataforma import Plataforma
-from .CheckpointView import CheckpointView
-from Nivel import CHECKPOINT_NIVEL_1
-from .BossSprite import BossSprite
+from .Event              import Event
+from .Camara             import Camara
+from .Personaje          import PersonajeSprite
+from .Enemigo_1          import Enemigo1Sprite
+from .Enemigo_2          import Enemigo2Sprite
+from .Plataforma         import Plataforma
+from .CheckpointView     import CheckpointView
+from .AngelView          import AngelView
+from .CorazonView        import CorazonView
+from .DagaPickupView     import DagaPickupView
+from .DagaProyectilSprite import DagaProyectilSprite
+from Nivel               import CHECKPOINT_NIVEL_1
+from .BossSprite         import BossSprite
+from .BloodEffect        import BloodEffect
+from .ExplosionEffect    import ExplosionEffect
+from .HitEffect          import HitEffect
 
 
 class PygameView:
@@ -64,23 +72,25 @@ class PygameView:
         Sprites visuales y shapes físicos de los enemigos.
     sprites_plataformas : list of Plataforma
         Geometría y visualización del nivel.
-
-    Eventos emitidos
-    ----------------
-    evt_cerrar, evt_mover_derecha_inicio, evt_mover_derecha_fin,
-    evt_mover_izquierda_inicio, evt_mover_izquierda_fin,
-    evt_saltar, evt_atacar.
     """
-
-    def __init__(self, frames_jugador, datos_enemigos, nivel_loader,datos_boss):
-        """Inicializa pygame, la ventana, los fondos, los sprites y los eventos."""
-        pygame.init()
-
-        self.screen = pygame.display.set_mode(
-            (Constantes.WIDTH, Constantes.HEIGHT),
-            pygame.DOUBLEBUF
-        )
-        pygame.display.set_caption("Juego de Plataformas - MVP")
+    def __init__(self, frames_jugador, datos_enemigos, nivel_loader, datos_boss, audio=None,
+                 frames_angel=None, datos_angel=None,
+                 imagen_corazon=None, datos_corazones=None,
+                 imagen_daga_pickup=None, datos_daga_pickup=None,
+                 frames_daga_proyectil=None):
+        """
+        Parámetros nuevos
+        -----------------
+        imagen_daga_pickup : pygame.Surface
+            Imagen del objeto daga en el suelo (Assets/Characters/Daga.png).
+        datos_daga_pickup : dict or None
+            {'x': int, 'y': int}. Si es None no hay objeto daga en el mapa.
+        frames_daga_proyectil : list of pygame.Surface
+            Frames del proyectil daga (Assets/Characters/Dagger/dagger.png).
+        """
+        # pygame.init() y set_mode() ya fueron llamados en main.py
+        # No volver a llamarlos aquí: reinicializarían el mixer y matarían la música.
+        self.screen = pygame.display.get_surface()
 
         self.reloj  = pygame.time.Clock()
         self.camara = Camara()
@@ -104,27 +114,25 @@ class PygameView:
         ).convert_alpha()
         self.sprites_plataformas = nivel_loader(tileset)
 
-        # --- Frames del proyectil (se cargan primero para usarlos en boss y enemigos) ---
+        # --- Proyectiles de enemigos ---
         escala_proj = Constantes.SCALA_PERSONAJE * 0.6
         frames_proyectil = []
         for i in range(1, 3):
             img = pygame.image.load(
                 f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
             ).convert_alpha()
-            w = int(img.get_width()  * escala_proj)
-            h = int(img.get_height() * escala_proj)
-            frames_proyectil.append(pygame.transform.scale(img, (w, h)))
+            frames_proyectil.append(pygame.transform.scale(
+                img, (int(img.get_width() * escala_proj),
+                      int(img.get_height() * escala_proj))))
 
-        # --- Sprites ---
+        # --- Sprites jugador y enemigos ---
         self.sprite_jugador = PersonajeSprite(250, 250, frames_jugador)
 
         self.sprite_boss = None
         if datos_boss:
             self.sprite_boss = BossSprite(
                 datos_boss['x'], datos_boss['y'],
-                datos_boss['anim_fase1'],
-                datos_boss['anim_fase2'],
-            )
+                datos_boss['anim_fase1'], datos_boss['anim_fase2'])
             self.sprite_boss.proyectil_frames = frames_proyectil
 
         self.sprites_enemigos = []
@@ -135,12 +143,35 @@ class PygameView:
                 )
             else:
                 self.sprites_enemigos.append(
-                    Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack'])
-                )
+                    Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
 
         for sprite in self.sprites_enemigos:
             if isinstance(sprite, Enemigo2Sprite):
                 sprite.proyectil_frames = frames_proyectil
+        if audio:
+            Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
+
+        # --- Ángel curador ---
+        pos_angel = (datos_angel['x'], datos_angel['y']) if datos_angel else (2200, 400)
+        self.sprite_angel = AngelView(pos_angel[0], pos_angel[1], frames_angel or [])
+
+        # --- Corazones ---
+        self.sprites_corazones = []
+        if imagen_corazon and datos_corazones:
+            for i, d in enumerate(datos_corazones):
+                self.sprites_corazones.append(
+                    CorazonView(d['x'], d['y'], imagen_corazon, indice=i))
+
+        # --- Daga pickup ---
+        self.sprite_daga_pickup = None
+        if imagen_daga_pickup and datos_daga_pickup:
+            self.sprite_daga_pickup = DagaPickupView(
+                datos_daga_pickup['x'], datos_daga_pickup['y'], imagen_daga_pickup)
+
+        # --- Proyectiles de daga del jugador ---
+        self._frames_daga_proyectil = frames_daga_proyectil or []
+        # Pool de sprites: se crea uno nuevo por cada proyectil vivo
+        self._sprites_dagas: list[DagaProyectilSprite] = []
 
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
@@ -150,11 +181,32 @@ class PygameView:
         self.evt_mover_izquierda_fin    = Event()
         self.evt_saltar                 = Event()
         self.evt_atacar                 = Event()
-        self.evt_guardar                = Event()   # K cerca del checkpoint
-        self.evt_cargar                 = Event()   # F10
+        self.evt_guardar                = Event()
+        self.evt_cargar                 = Event()
+        self.evt_pausa                  = Event()
+        self.evt_curar                  = Event()
+        self.evt_corazon_recogido       = Event()   # emite el índice
+        self.evt_daga_recogida          = Event()   # sin argumentos
+        self.evt_lanzar_daga            = Event()   # sin argumentos
+        self.audio = audio
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
+
+        # --- Efecto de sangre (muerte de enemigos) ---
+        self._frames_blood = self._cargar_frames_blood()
+        self._efectos_sangre: list = []
+
+        # --- Efecto de explosión (muerte de proyectiles enemigos) ---
+        self._frames_explosion = self._cargar_frames_explosion()
+        self._efectos_explosion: list = []
+
+        # --- Efecto de impacto de daga ---
+        self._frames_hit = self._cargar_frames_hit()
+        self._efectos_hit: list = []
+
+        # --- Muerte del boss: flag para disparar una sola vez ---
+        self._boss_muerte_disparada = False
 
     # ------------------------------------------------------------------
     # Acceso a datos compartidos con el Presenter
@@ -189,19 +241,32 @@ class PygameView:
         self.sprite_jugador.shape.center = (x, y)
         self.sprite_jugador._hitbox_ataque_cache = None
 
+    def restaurar_corazones_recogidos(self, indices: set):
+        for c in self.sprites_corazones:
+            if c.indice in indices:
+                c.recogido = True
+
+    def indices_corazones_recogidos(self):
+        return [c.indice for c in self.sprites_corazones if c.recogido]
+
+    def restaurar_daga_recogida(self):
+        """Si el save dice que la daga ya fue recogida, ocultarla del mapa."""
+        if self.sprite_daga_pickup:
+            self.sprite_daga_pickup.recogida = True
+
     # ------------------------------------------------------------------
     # Input
     # ------------------------------------------------------------------
 
-    def procesar_input(self):
-        """Captura eventos pygame y emite los eventos MVP correspondientes."""
-        for event in pygame.event.get():
+    def procesar_input(self, events):
+        """Procesa la lista de eventos pygame y emite los eventos MVP correspondientes."""
+        for event in events:
             if event.type == pygame.QUIT:
                 self.evt_cerrar.emit()
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.evt_cerrar.emit()
+                    self.evt_pausa.emit()
                 elif event.key == pygame.K_d:
                     self.evt_mover_derecha_inicio.emit()
                 elif event.key == pygame.K_a:
@@ -211,10 +276,18 @@ class PygameView:
                 elif event.key == pygame.K_j:
                     self.evt_atacar.emit()
                 elif event.key == pygame.K_k:
-                    if self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
+                    if self.sprite_angel.esta_cerca(self.sprite_jugador.shape):
+                        self.evt_curar.emit()
+                    elif self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
                         self.evt_guardar.emit()
+                elif event.key == pygame.K_l:
+                    self.evt_lanzar_daga.emit()
                 elif event.key == pygame.K_F10:
                     self.evt_cargar.emit()
+                elif event.key == pygame.K_SPACE:
+                    self.evt_saltar.emit()
+                    # El sonido de salto se dispara desde el Presenter
+                    # NO llamar aquí para evitar doble disparo si el salto falla.
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -247,19 +320,19 @@ class PygameView:
         self._mover_jugador(modelo, delta_time_ms)
         self._mover_enemigos(modelo, delta_time_ms)
         self._mover_proyectiles(modelo)
+        self._mover_dagas_jugador(modelo)      # ← proyectiles de daga
         self._detectar_combate(modelo)
+        self._detectar_corazones(modelo)
+        self._detectar_daga_pickup(modelo)     # ← recoger objeto daga
 
-        hitbox_espada = self._calcular_hitbox_ataque_jugador(
-            self.sprite_jugador.shape, modelo.jugador.flip
-        ) if modelo.jugador.atacando else None
+        hitbox_espada = (self._calcular_hitbox_ataque_jugador(
+            self.sprite_jugador.shape, modelo.jugador.flip)
+            if modelo.jugador.atacando else None)
 
         if self.sprite_boss and modelo.boss and modelo.boss.vivo:
-            # Sincronizar posición interna del Model con el sprite ANTES del tick
             modelo.boss._x = float(self.sprite_boss.shape.centerx)
             modelo.boss._y = float(self.sprite_boss.shape.centery)
-            # Guardar posición del jugador para que el Model la use
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
-            # Llamar tick_ia aquí para obtener el delta de ESTE frame
             pos_boss    = self.sprite_boss.shape.center
             pos_jugador = self.sprite_jugador.shape.center
             modelo.boss._last_jpos = pos_jugador
@@ -268,43 +341,110 @@ class PygameView:
             self.sprite_boss.shape.x += int(dx)
             self.sprite_boss.shape.y += int(dy)
 
-            # Colisión proyectiles del boss con el jugador
             for p in modelo.boss.proyectiles:
-                if p.vivo:
-                    # Mover proyectil
-                    p._x += p.vel_x
-                    p._y += p.vel_y
-                    p.shape.center = (int(p._x), int(p._y))
-                    # Fuera del mundo → matar (coordenadas de mundo, no de pantalla)
-                    if (p.shape.right < -2000 or p.shape.left > 8000
-                            or p.shape.bottom < -1000 or p.shape.top > 1500):
+                if not p.vivo:
+                    continue
+                p._x += p.vel_x
+                p._y += p.vel_y
+                p.shape.center = (int(p._x), int(p._y))
+                # Fuera de mapa: desaparecer sin explosión
+                if (p.shape.right < -2000 or p.shape.left > 8000
+                        or p.shape.bottom < -1000 or p.shape.top > 1500):
+                    p.vivo = False
+                    continue
+                # Colisión con plataforma
+                for plat in self.sprites_plataformas:
+                    if p.shape.colliderect(plat.shape):
                         p.vivo = False
-                        continue
-                    # Colisión con plataformas → matar
-                    for plat in self.sprites_plataformas:
-                        if p.shape.colliderect(plat.shape):
-                            p.vivo = False
-                            break
+                        break
+                # Bloqueado por espada del jugador
+                if p.vivo and hitbox_espada and hitbox_espada.colliderect(p.shape):
+                    p.vivo = False
+                # Impacta en el jugador
+                if p.vivo and p.shape.colliderect(self.sprite_jugador.shape):
+                    p.vivo = False
+                    modelo.golpe_proyectil_boss_a_jugador(p)
+                    self.audio.sfx_hurt_jugador()
+                # Explosión solo si acaba de morir en este frame
+                if not p.vivo and self._frames_explosion:
+                    self._efectos_explosion.append(
+                        ExplosionEffect(p.shape.centerx, p.shape.centery,
+                                        self._frames_explosion))
 
-                    # Espada del jugador destruye el proyectil
-                    if p.vivo and hitbox_espada and hitbox_espada.colliderect(p.shape):
-                        p.vivo = False
-                    # Impacto con jugador
-                    if p.shape.colliderect(self.sprite_jugador.shape):
-                        modelo.golpe_proyectil_boss_a_jugador(p)
-
-            # Colisión hitbox jugador con boss (cuerpo a cuerpo solo si embestida)
             if modelo.boss.embestida_activa:
                 if self.sprite_boss.shape.colliderect(self.sprite_jugador.shape):
                     modelo.golpe_boss_a_jugador()
 
-            # Colisión espada jugador → boss
-            hitbox_espada = self.sprite_jugador.hitbox_ataque
-            if hitbox_espada and hitbox_espada.colliderect(self.sprite_boss.shape):
+            hitbox_espada2 = self.sprite_jugador.hitbox_ataque
+            if hitbox_espada2 and hitbox_espada2.colliderect(self.sprite_boss.shape):
                 modelo.golpe_jugador_a_boss()
+            # Detectar muerte del boss en este frame
+            if not modelo.boss.vivo and not self._boss_muerte_disparada:
+                self._disparar_efectos_muerte_boss()
 
-            # Guardar posición del jugador para el Model
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
+
+            if self.audio and modelo.boss and modelo.boss.vivo:
+                self.audio.tick_rugido_boss()
+    # --- Mover proyectiles de daga del jugador ---
+
+    def _mover_dagas_jugador(self, modelo):
+        """Mueve los proyectiles de daga del jugador y detecta colisiones."""
+        for p in modelo.jugador.proyectiles_daga:
+            if not p.vivo:
+                continue
+
+            # Colisión con plataformas → destruir
+            for plat in self.sprites_plataformas:
+                if p.shape.colliderect(plat.shape):
+                    p.vivo = False
+                    break
+
+            if not p.vivo:
+                continue
+
+            # Colisión con enemigos
+            for i, (sprite_e, enemigo_m) in enumerate(
+                zip(self.sprites_enemigos, modelo.enemigos)
+            ):
+                if enemigo_m.vivo and p.shape.colliderect(sprite_e.shape):
+                    if self._frames_hit:
+                        self._efectos_hit.append(
+                            HitEffect(p.shape.centerx, p.shape.centery,
+                                      self._frames_hit))
+                    modelo.golpe_daga_jugador_a_enemigo(i, p)
+                    break
+
+            # Colisión con boss
+            if (p.vivo and self.sprite_boss
+                    and modelo.boss and modelo.boss.vivo
+                    and p.shape.colliderect(self.sprite_boss.shape)):
+                if self._frames_hit:
+                    self._efectos_hit.append(
+                        HitEffect(p.shape.centerx, p.shape.centery,
+                                  self._frames_hit))
+                modelo.golpe_daga_jugador_a_boss(p)
+                if not modelo.boss.vivo and not self._boss_muerte_disparada:
+                    self._disparar_efectos_muerte_boss()
+
+    # --- Recoger objeto daga del suelo ---
+
+    def _detectar_daga_pickup(self, modelo):
+        if (self.sprite_daga_pickup
+                and self.sprite_daga_pickup.colisiona_con(
+                    self.sprite_jugador.shape)):
+            self.sprite_daga_pickup.recoger()
+            self.evt_daga_recogida.emit()
+
+    # --- Colisión con corazones ---
+
+    def _detectar_corazones(self, modelo):
+        shape = self.sprite_jugador.shape
+        for corazon in self.sprites_corazones:
+            if corazon.colisiona_con(shape):
+                corazon.recoger()
+                self.evt_corazon_recogido.emit(corazon.indice)
+
     # --- Movimiento del jugador ---
 
     def _mover_jugador(self, modelo, delta_time_ms):
@@ -321,10 +461,8 @@ class PygameView:
         shape.x += delta_x
         for plat in self.sprites_plataformas:
             if shape.colliderect(plat.shape):
-                if delta_x > 0:
-                    shape.right = plat.shape.left
-                elif delta_x < 0:
-                    shape.left  = plat.shape.right
+                if delta_x > 0:  shape.right = plat.shape.left
+                elif delta_x < 0: shape.left  = plat.shape.right
 
         # --- Movimiento vertical ---
         # Se acumula en float para evitar errores de truncado con velocidades
@@ -338,9 +476,9 @@ class PygameView:
         for plat in self.sprites_plataformas:
             if shape.colliderect(plat.shape):
                 if jugador_m.velocidad_y >= 0:
-                    shape.bottom   = plat.shape.top
-                    jugador_m._y   = float(shape.y)
-                    tocando_suelo  = True
+                    shape.bottom  = plat.shape.top
+                    jugador_m._y  = float(shape.y)
+                    tocando_suelo = True
                     jugador_m.notificar_en_suelo()
                 else:
                     shape.top    = plat.shape.bottom
@@ -352,13 +490,16 @@ class PygameView:
 
         # Límites de pantalla
         if shape.bottom >= Constantes.HEIGHT:
-            shape.bottom   = Constantes.HEIGHT
-            jugador_m._y   = float(shape.y)
+            shape.bottom  = Constantes.HEIGHT
+            jugador_m._y  = float(shape.y)
             jugador_m.notificar_en_suelo()
         if shape.top < 0:
             shape.top    = 0
             jugador_m._y = float(shape.y)
             jugador_m.notificar_golpe_techo()
+        # Pasos (solo si está en suelo y moviéndose)
+        if self.audio and tocando_suelo and abs(modelo.delta_x_jugador) > 0:
+            self.audio.sfx_paso()
 
     # --- Movimiento de enemigos ---
 
@@ -366,9 +507,7 @@ class PygameView:
         from model.Enemigo1Model import Enemigo1Model
         pos_jugador = self.sprite_jugador.shape.center
 
-        for i, (sprite, enemigo_m) in enumerate(
-            zip(self.sprites_enemigos, modelo.enemigos)
-        ):
+        for sprite, enemigo_m in zip(self.sprites_enemigos, modelo.enemigos):
             if not enemigo_m.vivo:
                 continue
 
@@ -388,11 +527,9 @@ class PygameView:
                 for plat in self.sprites_plataformas:
                     if sprite.shape.colliderect(plat.shape):
                         if delta_x > 0:
-                            sprite.shape.right = plat.shape.left
-                            enemigo_m.flip     = True
+                            sprite.shape.right = plat.shape.left; enemigo_m.flip = True
                         elif delta_x < 0:
-                            sprite.shape.left  = plat.shape.right
-                            enemigo_m.flip     = False
+                            sprite.shape.left  = plat.shape.right; enemigo_m.flip = False
 
                 # Vertical
                 sprite.shape.y += int(enemigo_m.velocidad_y)
@@ -435,6 +572,12 @@ class PygameView:
                         p.vivo = False
                         break
 
+                # Explosión al chocar con plataforma (antes de limpiar)
+                if not p.vivo and self._frames_explosion:
+                    self._efectos_explosion.append(
+                        ExplosionEffect(p.shape.centerx, p.shape.centery,
+                                        self._frames_explosion))
+
             # Limpiar proyectiles muertos
             enemigo_m.proyectiles = [p for p in enemigo_m.proyectiles if p.vivo]
 
@@ -464,6 +607,8 @@ class PygameView:
             if (enemigo_m.hitbox_ataque
                     and enemigo_m.hitbox_ataque.colliderect(shape_jugador)):
                 modelo.golpe_enemigo_a_jugador()
+                self.audio.sfx_hurt_jugador()
+
 
             # Proyectiles del enemigo
             if hasattr(enemigo_m, 'proyectiles'):
@@ -473,8 +618,13 @@ class PygameView:
                     # Proyectil toca al jugador
                     if p.shape.colliderect(shape_jugador):
                         modelo.golpe_proyectil_a_jugador(p)
+                        self.audio.sfx_hurt_jugador()
                     # Jugador destruye el proyectil con la espada
                     elif hitbox_jugador and hitbox_jugador.colliderect(p.shape):
+                        if self._frames_explosion:
+                            self._efectos_explosion.append(
+                                ExplosionEffect(p.shape.centerx, p.shape.centery,
+                                                self._frames_explosion))
                         modelo.golpe_jugador_a_proyectil(p)
 
         # Actualizar hitbox de ataque en el Model para que la Vista la dibuje
@@ -514,30 +664,72 @@ class PygameView:
         for plat in self.sprites_plataformas:
             plat.draw(self.screen, self.camara)
 
-        # 4. Checkpoint
-        cerca = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
-        self.sprite_checkpoint.set_mostrar_prompt(cerca)
+        # Checkpoint
+        cerca_cp = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
+        self.sprite_checkpoint.set_mostrar_prompt(cerca_cp)
         self.sprite_checkpoint.draw(self.screen, self.camara)
 
-        # 5. Enemigos
+        # Ángel
+        cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
+        self.sprite_angel.set_mostrar_prompt(cerca_angel)
+        self.sprite_angel.draw(self.screen, self.camara)
+
+        # Corazones
+        for corazon in self.sprites_corazones:
+            corazon.draw(self.screen, self.camara)
+
+        # Objeto daga del suelo
+        if self.sprite_daga_pickup:
+            self.sprite_daga_pickup.draw(self.screen, self.camara)
+
+        # Enemigos
         for sprite, estado in zip(self.sprites_enemigos, estados_enemigos):
             sprite.sincronizar(estado)
             sprite.draw(self.screen, self.camara, estado)
 
-        # 6. Boss
+        # Boss
         if self.sprite_boss and modelo is not None and modelo.boss and modelo.boss.vivo:
             estado_boss = modelo.boss.obtener_estado(self.sprite_boss.shape.center)
             self.sprite_boss.sincronizar(estado_boss)
             self.sprite_boss.draw(self.screen, self.camara, estado_boss)
 
-        # 7. Jugador (encima de todo)
+        # Proyectiles de daga del jugador
+        if modelo is not None:
+            estados_dagas = estado_jugador.get('proyectiles_daga', [])
+            # Ajustar pool de sprites
+            while len(self._sprites_dagas) < len(estados_dagas):
+                self._sprites_dagas.append(
+                    DagaProyectilSprite(self._frames_daga_proyectil))
+            for sprite_d, estado_d in zip(self._sprites_dagas, estados_dagas):
+                sprite_d.draw(self.screen, self.camara, estado_d)
+
+        # Efectos de sangre (muerte de enemigos)
+        for efecto in self._efectos_sangre:
+            efecto.update()
+            efecto.draw(self.screen, self.camara)
+        self._efectos_sangre = [e for e in self._efectos_sangre if not e.terminado]
+
+        # Efectos de explosión (muerte de proyectiles enemigos)
+        for efecto in self._efectos_explosion:
+            efecto.update()
+            efecto.draw(self.screen, self.camara)
+        self._efectos_explosion = [e for e in self._efectos_explosion if not e.terminado]
+
+        # Efectos de impacto de daga
+        for efecto in self._efectos_hit:
+            efecto.update()
+            efecto.draw(self.screen, self.camara)
+        self._efectos_hit = [e for e in self._efectos_hit if not e.terminado]
+
+        # Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
 
-        # 8. HUD
+        # 6. HUD
         self.dibujar_hud(estado_jugador)
 
-        # 9. Presentar frame
+        # 7. Presentar frame
         pygame.display.flip()
+
     def obtener_estado_jugador(self, modelo):
         """Construye el dict de estado del jugador combinando Model y Vista.
 
@@ -558,24 +750,8 @@ class PygameView:
         )
 
     def obtener_estados_enemigos(self, modelo):
-        """Construye la lista de estados de todos los enemigos vivos.
-
-        Parameters
-        ----------
-        modelo : JuegoModel
-
-        Returns
-        -------
-        list of dict
-        """
-        estados = []
-        for sprite, enemigo_m in zip(self.sprites_enemigos, modelo.enemigos):
-            estados.append(enemigo_m.obtener_estado(pos=sprite.shape.center))
-        return estados
-
-    # ------------------------------------------------------------------
-    # Tiempo
-    # ------------------------------------------------------------------
+        return [em.obtener_estado(pos=s.shape.center)
+                for s, em in zip(self.sprites_enemigos, modelo.enemigos)]
 
     def refrescar(self):
         """Limita el loop a FPS y devuelve delta_time en milisegundos."""
@@ -584,7 +760,120 @@ class PygameView:
     def eliminar_sprite_enemigo(self, indice):
         """Elimina el sprite de un enemigo muerto de la lista."""
         if 0 <= indice < len(self.sprites_enemigos):
+            sprite = self.sprites_enemigos[indice]
+            # Disparar efecto de sangre en la posición del enemigo muerto
+            if self._frames_blood:
+                self._efectos_sangre.append(
+                    BloodEffect(sprite.shape.centerx, sprite.shape.centery,
+                                self._frames_blood))
             self.sprites_enemigos.pop(indice)
+
+    # ------------------------------------------------------------------
+    # Efectos visuales: sangre y explosión
+    # ------------------------------------------------------------------
+
+
+    def _cargar_frames_blood(self) -> list:
+        """Carga los 21 frames de la animación de sangre.
+        Devuelve lista vacía si los assets no están disponibles.
+        """
+        frames = []
+        try:
+            s = Constantes.SCALA_PERSONAJE
+            for i in range(1, 22):
+                img = pygame.image.load(
+                    f"Assets/Efectos/Blood/1_{i}.png"
+                ).convert_alpha()
+                img = pygame.transform.scale(
+                    img,
+                    (int(img.get_width() * s),
+                     int(img.get_height() * s))
+                )
+                frames.append(img)
+        except Exception as e:
+            print(f"[BloodEffect] No se pudieron cargar los frames: {e}")
+        return frames
+
+    def _cargar_frames_explosion(self) -> list:
+        """Carga los 8 frames de la animación de explosión de proyectiles.
+        Devuelve lista vacía si los assets no están disponibles.
+        """
+        frames = []
+        try:
+            s = Constantes.SCALA_PERSONAJE
+            for i in range(1, 9):
+                img = pygame.image.load(
+                    f"Assets/Efectos/explosion-1-f/Sprites/explosion-f{i}.png"
+                ).convert_alpha()
+                img = pygame.transform.scale(
+                    img,
+                    (int(img.get_width() * s),
+                     int(img.get_height() * s))
+                )
+                frames.append(img)
+        except Exception as e:
+            print(f"[ExplosionEffect] No se pudieron cargar los frames: {e}")
+        return frames
+
+    def _disparar_efectos_muerte_boss(self):
+        """Dispara sangre en las 3 puntas de un triángulo y explosión en el
+        centro, todos centrados sobre el sprite del boss en el momento de morir.
+
+        Triángulo equilátero orientado hacia arriba:
+          - Punta superior    : centro + (0,       -radio)
+          - Punta inf-derecha : centro + (+radio·sin60, +radio·cos60) ≈ (+r·0.866, +r·0.5)
+          - Punta inf-izquierda: centro + (-radio·sin60, +radio·cos60)
+        """
+        import math
+        self._boss_muerte_disparada = True
+
+        if not self.sprite_boss:
+            return
+
+        cx, cy = self.sprite_boss.shape.center
+        radio  = max(self.sprite_boss.shape.width,
+                     self.sprite_boss.shape.height) * 0.35
+
+        # Vértices del triángulo equilátero (punta arriba)
+        puntas = [
+            (cx,                             cy - radio),             # arriba
+            (cx + int(radio * math.sin(math.radians(120))),
+             cy - int(radio * math.cos(math.radians(120)))),          # inf-derecha
+            (cx - int(radio * math.sin(math.radians(120))),
+             cy - int(radio * math.cos(math.radians(120)))),          # inf-izquierda
+        ]
+
+        # Sangre en las tres puntas (cooldown alto = animación lenta y larga)
+        if self._frames_blood:
+            for px, py in puntas:
+                self._efectos_sangre.append(
+                    BloodEffect(px, py, self._frames_blood, cooldown_ms=100))
+
+        # Explosión en el centro (cooldown alto = animación lenta y larga)
+        if self._frames_explosion:
+            self._efectos_explosion.append(
+                ExplosionEffect(cx, cy, self._frames_explosion, cooldown_ms=120))
+
+    def _cargar_frames_hit(self) -> list:
+        """Carga los 3 frames de la animación de impacto de daga.
+        Devuelve lista vacía si los assets no están disponibles.
+        """
+        frames = []
+        try:
+            s = Constantes.SCALA_PERSONAJE
+            for i in range(1, 4):
+                img = pygame.image.load(
+                    f"Assets/Efectos/Hit/Sprites/hit{i}.png"
+                ).convert_alpha()
+                img = pygame.transform.scale(
+                    img,
+                    (int(img.get_width() * s),
+                     int(img.get_height() * s))
+                )
+                frames.append(img)
+        except Exception as e:
+            print(f"[HitEffect] No se pudieron cargar los frames: {e}")
+        return frames
 
     # ------------------------------------------------------------------
     # HUD
@@ -593,8 +882,18 @@ class PygameView:
     def dibujar_hud(self, estado_jugador):
         fuente = pygame.font.SysFont(None, 36)
 
-        texto_hp = fuente.render(f"Vidas: {estado_jugador['hp']}", True, (255, 255, 255))
+        hp     = estado_jugador['hp']
+        hp_max = estado_jugador.get('hp_max', hp)
+        texto_hp = fuente.render(f"Vidas: {hp} / {hp_max}", True, (255, 255, 255))
         self.screen.blit(texto_hp, (20, 20))
+
+        # Indicador de daga desbloqueada + cooldown
+        if estado_jugador.get('daga_desbloqueada'):
+            listo = estado_jugador.get('cooldown_daga_listo', True)
+            color = (100, 220, 255) if listo else (140, 140, 140)
+            texto_daga = fuente.render(
+                "[L] Daga" + (" ✓" if listo else " …"), True, color)
+            self.screen.blit(texto_daga, (20, 52))
 
         if not estado_jugador['vivo']:
             fuente_grande = pygame.font.SysFont(None, 120)
