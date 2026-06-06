@@ -150,6 +150,9 @@ class PygameView:
         self._frames_hit = self._cargar_frames_hit()
         self._efectos_hit: list = []
 
+        # --- Muerte del boss: flag para disparar una sola vez ---
+        self._boss_muerte_disparada = False
+
     # ------------------------------------------------------------------
     # Acceso compartido con el Presenter
     # ------------------------------------------------------------------
@@ -285,6 +288,9 @@ class PygameView:
             hitbox_espada2 = self.sprite_jugador.hitbox_ataque
             if hitbox_espada2 and hitbox_espada2.colliderect(self.sprite_boss.shape):
                 modelo.golpe_jugador_a_boss()
+            # Detectar muerte del boss en este frame
+            if not modelo.boss.vivo and not self._boss_muerte_disparada:
+                self._disparar_efectos_muerte_boss()
 
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
 
@@ -326,6 +332,8 @@ class PygameView:
                         HitEffect(p.shape.centerx, p.shape.centery,
                                   self._frames_hit))
                 modelo.golpe_daga_jugador_a_boss(p)
+                if not modelo.boss.vivo and not self._boss_muerte_disparada:
+                    self._disparar_efectos_muerte_boss()
 
     # --- Recoger objeto daga del suelo ---
 
@@ -650,6 +658,45 @@ class PygameView:
         except Exception as e:
             print(f"[ExplosionEffect] No se pudieron cargar los frames: {e}")
         return frames
+
+    def _disparar_efectos_muerte_boss(self):
+        """Dispara sangre en las 3 puntas de un triángulo y explosión en el
+        centro, todos centrados sobre el sprite del boss en el momento de morir.
+
+        Triángulo equilátero orientado hacia arriba:
+          - Punta superior    : centro + (0,       -radio)
+          - Punta inf-derecha : centro + (+radio·sin60, +radio·cos60) ≈ (+r·0.866, +r·0.5)
+          - Punta inf-izquierda: centro + (-radio·sin60, +radio·cos60)
+        """
+        import math
+        self._boss_muerte_disparada = True
+
+        if not self.sprite_boss:
+            return
+
+        cx, cy = self.sprite_boss.shape.center
+        radio  = max(self.sprite_boss.shape.width,
+                     self.sprite_boss.shape.height) * 0.35
+
+        # Vértices del triángulo equilátero (punta arriba)
+        puntas = [
+            (cx,                             cy - radio),             # arriba
+            (cx + int(radio * math.sin(math.radians(120))),
+             cy - int(radio * math.cos(math.radians(120)))),          # inf-derecha
+            (cx - int(radio * math.sin(math.radians(120))),
+             cy - int(radio * math.cos(math.radians(120)))),          # inf-izquierda
+        ]
+
+        # Sangre en las tres puntas (cooldown alto = animación lenta y larga)
+        if self._frames_blood:
+            for px, py in puntas:
+                self._efectos_sangre.append(
+                    BloodEffect(px, py, self._frames_blood, cooldown_ms=100))
+
+        # Explosión en el centro (cooldown alto = animación lenta y larga)
+        if self._frames_explosion:
+            self._efectos_explosion.append(
+                ExplosionEffect(cx, cy, self._frames_explosion, cooldown_ms=120))
 
     def _cargar_frames_hit(self) -> list:
         """Carga los 3 frames de la animación de impacto de daga.

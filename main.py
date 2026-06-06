@@ -78,16 +78,16 @@ def iniciar_partida(cargar_save=False):
     ]
     datos_boss  = {'tipo': 'boss', 'x': 3050, 'y': 400,
                    'anim_fase1': anim_boss_nofiro, 'anim_fase2': anim_boss_fire}
-    datos_angel = {'x': 2200, 'y': 400}
+    datos_angel = {'x': 0, 'y': 540}
 
     datos_corazones = [
         {'x': 900,  'y': 560},
         {'x': 1800, 'y': 528},
-        {'x': 2600, 'y': 400},
+        {'x': 2600, 'y': 640},
     ]
 
     # Posición del objeto daga en el mapa (ajusta a tu nivel)
-    datos_daga_pickup = {'x': 1200, 'y': 400}
+    datos_daga_pickup = {'x': 1200, 'y': 620}
 
     # ---------------------------------------------------------------------------
     # Composición MVP
