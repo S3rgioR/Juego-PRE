@@ -127,7 +127,11 @@ class PygameView:
                       int(img.get_height() * escala_proj))))
 
         # --- Sprites jugador y enemigos ---
-        self.sprite_jugador = PersonajeSprite(250, 250, frames_jugador)
+        # Posición inicial: x=16 + mitad del ancho (para que el centro quede en x~16+half)
+        # Y: el bottom del shape debe estar en SUELO_Y - 16
+        _x_inicio = 16 + Constantes.WIDTH_PERSONAJE // 2
+        _y_inicio = Constantes.SUELO_Y - 16 - Constantes.HEIGHT_PERSONAJE // 2
+        self.sprite_jugador = PersonajeSprite(_x_inicio, _y_inicio, frames_jugador)
 
         self.sprite_boss = None
         if datos_boss:
