@@ -73,6 +73,8 @@ DATOS_NIVEL_1 = {
     ],
 
     'daga_pickup': {'x': 1200, 'y': 620},
+
+    'fin_nivel': {'x': 3400, 'y': 500, 'ancho': 40, 'alto': 200},
 }
 
 
@@ -120,6 +122,7 @@ DATOS_NIVEL_2 = {
     'angel':       {'x': 0, 'y': 540},
     'corazones':   [{'x': 700, 'y': 560}],
     'daga_pickup': None,   # sin daga en el nivel 2
+    'fin_nivel': {'x': 19800, 'y': 500, 'ancho': 40, 'alto': 200},
 }
 
 

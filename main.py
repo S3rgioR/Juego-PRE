@@ -53,7 +53,7 @@ def _inyectar_anims(datos_nivel, anim_ogre_walk, anim_ogre_attack,
     return datos_enemigos, datos_boss
 
 
-def iniciar_partida(audio, num_nivel=1, cargar_save=False):
+def iniciar_partida(audio, num_nivel=1, cargar_save=False,):
     """Carga assets, compone MVP e inicia el game loop. Devuelve el presenter.
 
     Parameters
@@ -64,6 +64,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False):
     cargar_save : bool
         Si True, restaura la partida guardada al arrancar.
     """
+
     if num_nivel not in NIVELES:
         print(f"[main] ⚠ Nivel {num_nivel} no existe. Cargando nivel 1.")
         num_nivel = 1
@@ -132,6 +133,8 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False):
     # ---------------------------------------------------------------------------
     modelo = JuegoModel(datos_enemigos, datos_boss)
 
+    datos_fin_nivel = datos_nivel.get('fin_nivel', None)
+
     vista = PygameView(
         frames_jugador        = frames_jugador,
         datos_enemigos        = datos_enemigos,
@@ -145,12 +148,14 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False):
         imagen_daga_pickup    = img_daga_pickup,
         datos_daga_pickup     = datos_daga_pickup,
         frames_daga_proyectil = frames_daga_proyectil,
+        datos_fin_nivel=datos_fin_nivel,
     )
 
     presenter = JuegoPresenter(
         vista, modelo,
         num_frames_ataque_jugador=len(frames_jugador['AtaqueParado']),
         audio=audio,
+        num_nivel=num_nivel,
     )
 
     # Arrancar música del nivel (si no hay ya música sonando)
@@ -183,8 +188,16 @@ def main():
         if accion == 'salir':
             break
         elif accion == 'jugar':
-            presenter = iniciar_partida(audio, num_nivel=1, cargar_save=False)
-            if presenter.salida_forzada: break
+            num_nivel = 1
+            while num_nivel in NIVELES:
+                presenter = iniciar_partida(audio, num_nivel=num_nivel)
+                if presenter.salida_forzada:
+                    break
+                if presenter.nivel_completado:
+                    num_nivel += 1
+                    pygame.mixer.music.stop()
+                else:
+                    break  # volvió al menú sin completar
         elif accion == 'cargar':
             presenter = iniciar_partida(audio, num_nivel=1, cargar_save=True)
             if presenter.salida_forzada: break

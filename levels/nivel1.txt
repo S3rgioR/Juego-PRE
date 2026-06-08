@@ -1,48 +1,16 @@
 # Nivel 1 — Terreno
 #
-# Formato: x1 y1  x2 y2  x3 y3 ...
-# Cada par es un vértice del contorno del suelo.
-# Tramos horizontales (mismo Y) → suelo pisable.
-# Tramos verticales   (mismo X) → pared lateral.
-# Y=0 es la parte superior; las coordenadas pueden ser negativas.
+# Una sola secuencia de vértices (x y) sin repeticiones.
+# El parser infiere el tipo de tramo entre vértices consecutivos:
+#   mismo Y → suelo pisable   |   mismo X → pared lateral
 #
-# Estructura del nivel 1:
-#
+# Vista:
 #         ___         ___      ______
 #        |   |       |   |    |      |
-#  ______|   |_______|   |____|      |_______  ← suelo base y=656
-#
-#  Los desniveles replican las tres plataformas elevadas del nivel original.
+#  ______|   |_______|   |____|      |_______  ← y=656
 
-# Suelo base de inicio (borde izquierdo fuera de pantalla)
 -1000 656
-
-# Subida a la primera plataforma (x=160, altura y=608)
-160 656   160 608
-
-# Techo de la primera plataforma
-160 608   360 608
-
-# Bajada al suelo base
-360 608   360 656
-
-# Suelo hasta la segunda plataforma
-360 656   800 656   800 560
-
-# Techo de la segunda plataforma
-800 560   1000 560
-
-# Bajada al suelo
-1000 560   1000 656
-
-# Suelo hasta la tercera plataforma
-1000 656   1500 656   1500 528
-
-# Techo de la tercera plataforma
-1500 528   1800 528
-
-# Bajada al suelo
-1800 528   1800 656
-
-# Suelo hasta el borde derecho (más allá del boss)
-1800 656   20000 656
+160 656   160 608   360 608   360 656
+800 656   800 560   1000 560  1000 656
+1500 656  1500 528  1800 528  1800 656
+20000 656

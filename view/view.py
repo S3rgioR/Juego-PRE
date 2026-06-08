@@ -77,7 +77,8 @@ class PygameView:
                  frames_angel=None, datos_angel=None,
                  imagen_corazon=None, datos_corazones=None,
                  imagen_daga_pickup=None, datos_daga_pickup=None,
-                 frames_daga_proyectil=None):
+                 frames_daga_proyectil=None,
+                 datos_fin_nivel=None):
         """
         Parámetros nuevos
         -----------------
@@ -189,6 +190,18 @@ class PygameView:
         self.evt_daga_recogida          = Event()   # sin argumentos
         self.evt_lanzar_daga            = Event()   # sin argumentos
         self.audio = audio
+
+        self.evt_nivel_completado = Event()
+
+        # Rect del trigger (None si el nivel no tiene salida)
+        self._trigger_fin_nivel = None
+        if datos_fin_nivel:
+            self._trigger_fin_nivel = pygame.Rect(
+                datos_fin_nivel['x'],
+                datos_fin_nivel['y'],
+                datos_fin_nivel['ancho'],
+                datos_fin_nivel['alto'],
+            )
 
         # --- Checkpoint ---
         self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
@@ -386,6 +399,11 @@ class PygameView:
 
             if self.audio and modelo.boss and modelo.boss.vivo:
                 self.audio.tick_rugido_boss()
+
+        # Trigger de fin de nivel
+        if (self._trigger_fin_nivel
+                and self.sprite_jugador.shape.colliderect(self._trigger_fin_nivel)):
+            self.evt_nivel_completado.emit()
     # --- Mover proyectiles de daga del jugador ---
 
     def _mover_dagas_jugador(self, modelo):
@@ -729,6 +747,12 @@ class PygameView:
 
         # 7. Presentar frame
         pygame.display.flip()
+
+        if self._trigger_fin_nivel:
+            pygame.draw.rect(self.screen, (0, 255, 100),
+                             self.camara.aplicar(self._trigger_fin_nivel), 3)
+
+
 
     def obtener_estado_jugador(self, modelo):
         """Construye el dict de estado del jugador combinando Model y Vista.

@@ -34,7 +34,7 @@ class JuegoPresenter:
         Número de frames de la animación de ataque del jugador.
     """
 
-    def __init__(self, vista, modelo, num_frames_ataque_jugador=4, audio=None):
+    def __init__(self, vista, modelo, num_frames_ataque_jugador=4, audio=None, num_nivel=1):
 
         self.vista      = vista
         self.audio = audio
@@ -78,7 +78,14 @@ class JuegoPresenter:
         self.vista.evt_daga_recogida.add_listener(self._daga_recogida)
         self.vista.evt_lanzar_daga.add_listener(self._lanzar_daga)
 
+        self.num_nivel = num_nivel
+        self.nivel_completado = False
+        self.vista.evt_nivel_completado.add_listener(self._nivel_completado)
+
     # --- Handlers de eventos ---
+    def _nivel_completado(self):
+        self.nivel_completado = True
+        self.ejecutando = False
 
     def _cerrar(self):
         self.ejecutando     = False
