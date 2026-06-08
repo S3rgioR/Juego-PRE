@@ -1,16 +1,18 @@
-# Nivel 1 — Terreno
+# Nivel 1 — Poligono cerrado
 #
-# Una sola secuencia de vértices (x y) sin repeticiones.
-# El parser infiere el tipo de tramo entre vértices consecutivos:
-#   mismo Y → suelo pisable   |   mismo X → pared lateral
+# Formato: dx dy dx dy ...
+#   dx > 0  suelo (derecha)    dx < 0  techo (izquierda)
+#   dy > 0  pared sube         dy < 0  pared baja
 #
-# Vista:
+# Vista (bloques):
+#
 #         ___         ___      ______
 #        |   |       |   |    |      |
-#  ______|   |_______|   |____|      |_______  ← y=656
+#  ______|   |_______|   |____|      |_______
+#
+# Recorrido del contorno en sentido horario:
+# Empieza en (0,0), va a la derecha por el suelo,
+# sube/baja en cada escalon, y cierra volviendo por el techo.
 
--1000 656
-160 656   160 608   360 608   360 656
-800 656   800 560   1000 560  1000 656
-1500 656  1500 528  1800 528  1800 656
-20000 656
+# --- suelo base hacia la derecha ---
+15 12 15 -6 12 9 6 -9 12 12 -6 6 18 -18 24 33 -54 -9 -9 9 -33 -39

@@ -1,13 +1,22 @@
-# Nivel 2 — Terreno
-#
-# Misma convención: vértices únicos, sin repetir el punto de unión.
+# Nivel 2 — Poligono cerrado
 #
 # Vista:
 #    ___         _________
 #   |   |       |         |___________
-#  _|   |_______|                     |_  ← y=656
+#  _|   |_______|                     |_
 
--1000 656
-80 656   300 580   600 580   600 656
-900 656   900 520   1300 520  1300 580  1600 580  1600 656
-20000 656
+# --- suelo ---
+18 0    # suelo hasta escalon 1
+0 5     # sube 5
+19 0    # suelo plataforma 1
+0 3     # sube 3 mas (plataforma alta)
+25 0    # suelo plataforma alta
+0 -3    # baja 3
+19 0    # suelo plataforma media
+0 -5    # baja al suelo base
+56 0    # suelo final
+
+# --- cierre ---
+0 10    # sube al techo
+-137 0  # techo de vuelta
+0 -10   # baja al origen
