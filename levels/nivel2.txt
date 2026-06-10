@@ -1,22 +1,6 @@
 # Nivel 2 — Poligono cerrado
 #
-# Vista:
-#    ___         _________
-#   |   |       |         |___________
-#  _|   |_______|                     |_
 
 # --- suelo ---
-18 0    # suelo hasta escalon 1
-0 5     # sube 5
-19 0    # suelo plataforma 1
-0 3     # sube 3 mas (plataforma alta)
-25 0    # suelo plataforma alta
-0 -3    # baja 3
-19 0    # suelo plataforma media
-0 -5    # baja al suelo base
-56 0    # suelo final
 
-# --- cierre ---
-0 10    # sube al techo
--137 0  # techo de vuelta
-0 -10   # baja al origen
+18 9 12 6 12 15 -12 3 21 6 21 -6 9 -3 -9 -15 9 -6 102 51 -78 -39 -24 3 9 36 -90 -12 27 -3 -27 -21 27 -3 -27 -21

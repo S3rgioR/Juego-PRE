@@ -134,6 +134,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False,):
     modelo = JuegoModel(datos_enemigos, datos_boss)
 
     datos_fin_nivel = datos_nivel.get('fin_nivel', None)
+    datos_spawn     = datos_nivel.get('spawn', None)
 
     vista = PygameView(
         frames_jugador        = frames_jugador,
@@ -149,6 +150,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False,):
         datos_daga_pickup     = datos_daga_pickup,
         frames_daga_proyectil = frames_daga_proyectil,
         datos_fin_nivel=datos_fin_nivel,
+        datos_spawn    =datos_spawn,
     )
 
     presenter = JuegoPresenter(

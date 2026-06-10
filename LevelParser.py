@@ -163,34 +163,24 @@ class LevelParser:
     # Construccion
     # -----------------------------------------------------------------------
 
-    # -----------------------------------------------------------------------
-    # Trazas de depuracion
-    # Pon DEBUG_LEVEL_PARSER = True para ver los segmentos en consola.
-    # Pon DEBUG_ONLY_PARED   = True para ver solo las paredes.
-    # -----------------------------------------------------------------------
-    DEBUG_LEVEL_PARSER = True
-    DEBUG_ONLY_PARED   = False   # True = solo imprime segmentos de tipo 'pared'
+    # ----------------------------------------------------------------------
 
     def _trazar_segmento(self, i, seg, prev_seg, next_seg):
         """Imprime los valores de un segmento y sus vecinos por consola."""
-        if not self.DEBUG_LEVEL_PARSER:
-            return
-        if self.DEBUG_ONLY_PARED and seg['tipo'] != 'pared':
-            return
+
 
 
         if seg['tipo'] == 'pared':
             sube = seg['dy'] > 0
-            print(f"  direccion: {'SUBE (pared_iz)' if sube else 'BAJA (pared_der)'}")
-            print(f"  y_inicio (tile_sup) = {seg['y1']}  →  y_fin (tile_inf) = {seg['y2']}")
+
 
     def _construir(self, segmentos: list) -> list:
         plataformas = []
         ts = self.tileset
         n  = len(segmentos)
 
-        if self.DEBUG_LEVEL_PARSER:
-            print(f"\n[LevelParser] ════ INICIO CONSTRUCCION ({n} segmentos) ════")
+
+
 
         # 1. Extraer vertices del poligono para el scanline de relleno
         vertices = self._extraer_vertices(segmentos)
@@ -212,8 +202,8 @@ class LevelParser:
             elif seg['tipo'] == 'pared':
                 self._tramo_pared(plataformas, ts, seg, prev_seg, next_seg)
 
-        if self.DEBUG_LEVEL_PARSER:
-            print(f"\n[LevelParser] ════ FIN: {len(plataformas)} plataformas generadas ════\n")
+
+
 
         return plataformas
 

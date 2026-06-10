@@ -1,140 +1,106 @@
-"""Definiciones de niveles del juego.
-
-Cada nivel expone:
-  - cargar_nivel_N(tileset)  → list[Plataforma]   (terreno leído del .txt)
-  - DATOS_NIVEL_N            → dict con entidades, checkpoint, música, etc.
-
-El terreno se construye leyendo un archivo .txt mediante LevelParser.
-Las entidades (enemigos, boss, objetos) se definen aquí en Python porque
-necesitan referencias a assets (frames de animación) que se cargan en main.py
-y se pasan como parámetros al construir la Vista.
-
-Añadir un nivel nuevo:
-  1. Crear  levels/nivel2.txt  con los vértices del terreno.
-  2. Definir DATOS_NIVEL_2 con sus entidades.
-  3. Definir cargar_nivel_2(tileset) que llame a LevelParser.
-  4. Registrar el nivel en NIVELES (al final de este archivo).
-"""
+"""Definiciones de niveles del juego."""
 
 import pygame
-from LevelParser import LevelParser
+from LevelParser  import LevelParser
+from TileCoords   import tp, tp_abs, tiles_to_px
 
 
 # ===========================================================================
 # NIVEL 1
 # ===========================================================================
 
-CHECKPOINT_NIVEL_1 = (500, 620)   # coordenadas de mundo del checkpoint
+CHECKPOINT_NIVEL_1 = tp_abs(10, 0)
 
-# Entidades del nivel 1.
-# Los frames de animación (listas de pygame.Surface) se inyectan en main.py
-# después de cargar los assets; aquí solo se definen posición y parámetros.
 DATOS_NIVEL_1 = {
+    'spawn':      tp_abs(1, 0),          # ← posición de aparición del jugador
     'checkpoint': CHECKPOINT_NIVEL_1,
     'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
 
     'enemigos': [
         {
-            'tipo':                 'terrestre',
-            'x':                    600,
-            'y':                    400,
-            'distancia_patrulla':   2000,
-            'num_frames_ataque':    6,
-            # 'anim_walk' y 'anim_attack' se inyectan desde main.py
+            'tipo':               'terrestre',
+            **tp(20, 0),
+            'distancia_patrulla': tiles_to_px(33),
+            'num_frames_ataque':  6,
         },
         {
-            'tipo':                 'terrestre',
-            'x':                    1500,
-            'y':                    400,
-            'distancia_patrulla':   10000,
-            'num_frames_ataque':    6,
+            'tipo':               'terrestre',
+            **tp(50, 0),
+            'distancia_patrulla': tiles_to_px(166),
+            'num_frames_ataque':  6,
         },
         {
-            'tipo':                 'volador',
-            'x':                    1000,
-            'y':                    400,
-            'distancia_patrulla':   300,
+            'tipo':               'volador',
+            **tp(33, 5),
+            'distancia_patrulla': tiles_to_px(5),
         },
     ],
 
-    'boss': {
-        'tipo': 'boss',
-        'x':    3050,
-        'y':    400,
-        # 'anim_fase1' y 'anim_fase2' se inyectan desde main.py
+    'boss': None,
+
+    'angel':      tp(3, 2),
+    'corazones': [tp(30, 1), tp(60, 16)],
+    'daga_pickup': None,
+
+    'fin_nivel': {
+        **tp(75, 16),
+        'ancho': 40,
+        'alto':  200,
     },
-
-    'angel': {'x': 0, 'y': 540},
-
-    'corazones': [
-        {'x': 900,  'y': 560},
-        {'x': 1800, 'y': 528},
-        {'x': 2600, 'y': 640},
-    ],
-
-    'daga_pickup': {'x': 1200, 'y': 620},
-
-    'fin_nivel': {'x': 3400, 'y': 500, 'ancho': 40, 'alto': 200},
 }
 
 
 def cargar_nivel_1(tileset: pygame.Surface) -> list:
-    """Construye y devuelve las plataformas del nivel 1 desde su .txt.
-
-    Parameters
-    ----------
-    tileset : pygame.Surface
-        Hoja de tiles cargada en memoria.
-
-    Returns
-    -------
-    list of Plataforma
-    """
     return LevelParser(tileset).cargar('levels/nivel1.txt')
 
 
 # ===========================================================================
-# NIVEL 2  (plantilla — personaliza el .txt y las entidades)
+# NIVEL 2
 # ===========================================================================
 
 DATOS_NIVEL_2 = {
-    'checkpoint': (400, 600),
+    'spawn':      tp_abs(1, 0),          # ← posición de aparición del jugador
+    'checkpoint': tp_abs(3, 1),
     'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
 
     'enemigos': [
         {
             'tipo':               'terrestre',
-            'x':                  500,
-            'y':                  400,
-            'distancia_patrulla': 300,
+            **tp(9, 33),
+            'distancia_patrulla': tiles_to_px(5),
             'num_frames_ataque':  6,
         },
         {
             'tipo':               'volador',
-            'x':                  900,
-            'y':                  350,
-            'distancia_patrulla': 400,
+            **tp(63, 54),
+            'distancia_patrulla': tiles_to_px(6),
         },
     ],
 
-    'boss': None,   # sin boss en el nivel 2
+    'boss': {
+        'tipo': 'boss',
+        **tp(101, 18),
+    },
 
-    'angel':       {'x': 0, 'y': 540},
-    'corazones':   [{'x': 700, 'y': 560}],
-    'daga_pickup': None,   # sin daga en el nivel 2
-    'fin_nivel': {'x': 19800, 'y': 500, 'ancho': 40, 'alto': 200},
+    'angel':       tp(4, 33),
+    'corazones':   [tp(15, 51)],
+    'daga_pickup': tp(6, 51),
+
+    'fin_nivel': {
+        **tp(660, 0),
+        'ancho': 40,
+        'alto':  200,
+    },
 }
 
 
 def cargar_nivel_2(tileset: pygame.Surface) -> list:
-    """Construye y devuelve las plataformas del nivel 2 desde su .txt."""
     return LevelParser(tileset).cargar('levels/nivel2.txt')
 
 
 # ===========================================================================
 # Registro de niveles
 # ===========================================================================
-# Añade aquí cada nivel nuevo: (función_loader, dict_datos)
 NIVELES = {
     1: (cargar_nivel_1, DATOS_NIVEL_1),
     2: (cargar_nivel_2, DATOS_NIVEL_2),

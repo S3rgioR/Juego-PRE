@@ -77,6 +77,7 @@ class PygameView:
                  frames_angel=None, datos_angel=None,
                  imagen_corazon=None, datos_corazones=None,
                  imagen_daga_pickup=None, datos_daga_pickup=None,
+                 datos_spawn=None,
                  frames_daga_proyectil=None,
                  datos_fin_nivel=None):
         """
@@ -127,10 +128,13 @@ class PygameView:
                       int(img.get_height() * escala_proj))))
 
         # --- Sprites jugador y enemigos ---
-        # Posición inicial: x=16 + mitad del ancho (para que el centro quede en x~16+half)
-        # Y: el bottom del shape debe estar en SUELO_Y - 16
-        _x_inicio = 16 + Constantes.WIDTH_PERSONAJE // 2
-        _y_inicio = Constantes.SUELO_Y - 16 - Constantes.HEIGHT_PERSONAJE // 2
+        # Posición inicial: desde datos_spawn del nivel, o fallback al borde izquierdo.
+        if datos_spawn:
+            _x_inicio = datos_spawn[0]
+            _y_inicio = datos_spawn[1]
+        else:
+            _x_inicio = 16 + Constantes.WIDTH_PERSONAJE // 2
+            _y_inicio = Constantes.SUELO_Y - 16 - Constantes.HEIGHT_PERSONAJE // 2
         self.sprite_jugador = PersonajeSprite(_x_inicio, _y_inicio, frames_jugador)
 
         self.sprite_boss = None
@@ -515,8 +519,8 @@ class PygameView:
             shape.bottom  = Constantes.HEIGHT
             jugador_m._y  = float(shape.y)
             jugador_m.notificar_en_suelo()
-        if shape.top < 0:
-            shape.top    = 0
+        if shape.top < -5000:  # límite de mundo, no de pantalla
+            shape.top    = -5000
             jugador_m._y = float(shape.y)
             jugador_m.notificar_golpe_techo()
         # Pasos (solo si está en suelo y moviéndose)
