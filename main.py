@@ -53,7 +53,7 @@ def _inyectar_anims(datos_nivel, anim_ogre_walk, anim_ogre_attack,
     return datos_enemigos, datos_boss
 
 
-def iniciar_partida(audio, num_nivel=1, cargar_save=False,):
+def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo=None):
     """Carga assets, compone MVP e inicia el game loop. Devuelve el presenter.
 
     Parameters
@@ -133,6 +133,12 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False,):
     # ---------------------------------------------------------------------------
     modelo = JuegoModel(datos_enemigos, datos_boss)
 
+    # Restaurar estado del jugador del nivel anterior (hp_max, daga, etc.)
+    if estado_jugador_previo:
+        modelo.cargar_estado_guardado(estado_jugador_previo)
+        if estado_jugador_previo.get('daga_desbloqueada'):
+            modelo.jugador_desbloquear_daga()
+
     datos_fin_nivel = datos_nivel.get('fin_nivel', None)
     datos_spawn     = datos_nivel.get('spawn', None)
 
@@ -191,17 +197,36 @@ def main():
             break
         elif accion == 'jugar':
             num_nivel = 1
+            estado_jugador_previo = None
             while num_nivel in NIVELES:
-                presenter = iniciar_partida(audio, num_nivel=num_nivel)
+                presenter = iniciar_partida(audio, num_nivel=num_nivel,
+                                            estado_jugador_previo=estado_jugador_previo)
                 if presenter.salida_forzada:
                     break
+                if presenter.nivel_a_cargar:
+                    # El jugador pidió cargar desde el menú de pausa y el save
+                    # corresponde a un nivel diferente: relanzar en ese nivel.
+                    num_nivel = presenter.nivel_a_cargar
+                    pygame.mixer.music.stop()
+                    presenter = iniciar_partida(audio, num_nivel=num_nivel,
+                                                cargar_save=True)
+                    if presenter.salida_forzada:
+                        break
+                    # Continuar el while con el nivel actual del nuevo presenter
+                    num_nivel = presenter.num_nivel
+                    continue
                 if presenter.nivel_completado:
+                    estado_jugador_previo = presenter.modelo.obtener_estado_guardado()
+                    estado_jugador_previo['daga_desbloqueada'] = presenter.modelo.jugador.daga_desbloqueada
                     num_nivel += 1
                     pygame.mixer.music.stop()
                 else:
                     break  # volvió al menú sin completar
         elif accion == 'cargar':
-            presenter = iniciar_partida(audio, num_nivel=1, cargar_save=True)
+            # Leer el nivel del save antes de arrancar
+            datos_save = save_manager.cargar()
+            num_nivel_save = datos_save.get('num_nivel', 1) if datos_save else 1
+            presenter = iniciar_partida(audio, num_nivel=num_nivel_save, cargar_save=True)
             if presenter.salida_forzada: break
 
     pygame.quit()

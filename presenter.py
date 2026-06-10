@@ -51,7 +51,8 @@ class JuegoPresenter:
         self.save_manager = SaveManager()
         self._pausado     = False
         self._menu_pausa  = None   # se crea al pausar (así tiene el save actualizado)
-        self.salida_forzada = False  # True si el usuario cerró la ventana con la X
+        self.salida_forzada   = False  # True si el usuario cerró la ventana con la X
+        self.nivel_a_cargar   = None   # int si hay que relanzar en otro nivel
 
         # --- Suscripción a eventos de la Vista ---
         self.vista.evt_cerrar.add_listener(self._cerrar)
@@ -150,6 +151,12 @@ class JuegoPresenter:
             estado['pos']                 = list(self.vista.sprite_jugador.shape.center)
             estado['camara']              = self.vista.camara_pos
             estado['corazones_recogidos'] = self.vista.indices_corazones_recogidos()
+            estado['num_nivel']           = self.num_nivel
+            estado['daga_desbloqueada']   = self.modelo.jugador.daga_desbloqueada
+            # Guardar si el boss ya fue derrotado
+            estado['boss_derrotado'] = (
+                self.modelo.boss is None or not self.modelo.boss.vivo
+            )
             # Guardar si la daga pickup ya fue recogida
             estado['daga_recogida'] = (
                 self.vista.sprite_daga_pickup is None
@@ -162,13 +169,30 @@ class JuegoPresenter:
             print(f"[Presenter] ✗ Error al guardar: {e}")
 
     def _cargar_partida(self):
-        """Carga y restaura posición (en Vista), hp (en Model) y cámara."""
+        """Carga y restaura posición (en Vista), hp (en Model) y cámara.
+
+        Si el nivel guardado es distinto al actual, cierra este nivel y
+        señaliza a main.py para que arranque el nivel correcto vía
+        self.nivel_a_cargar (int) con los datos del save ya leídos.
+        """
         try:
             datos = self.save_manager.cargar()
             if datos is None:
                 print("[Presenter] No hay partida guardada"); return
 
-            self.modelo.cargar_estado_guardado(datos)   # restaura hp, hp_max, daga
+            nivel_guardado = datos.get('num_nivel', self.num_nivel)
+
+            # Si el nivel guardado es diferente, cerramos este loop y dejamos
+            # que main.py relance iniciar_partida con cargar_save=True.
+            if nivel_guardado != self.num_nivel:
+                self.nivel_a_cargar  = nivel_guardado
+                self.ejecutando      = False
+                self._pausado        = False
+                print(f"[Presenter] → Cambiando al nivel {nivel_guardado} para cargar")
+                return
+
+            # Mismo nivel: restaurar en caliente sin reiniciar la escena.
+            self.modelo.cargar_estado_guardado(datos)
 
             if 'pos' in datos:
                 x, y = datos['pos']
@@ -179,13 +203,15 @@ class JuegoPresenter:
                 self.vista.restaurar_corazones_recogidos(
                     set(datos['corazones_recogidos']))
             if datos.get('daga_recogida'):
-                # Estaba recogida al guardar → ocultarla y desbloquear habilidad.
                 self.vista.restaurar_daga_recogida()
                 self.modelo.jugador_desbloquear_daga()
             else:
-                # No estaba recogida al guardar → reaparece en el mapa.
                 if self.vista.sprite_daga_pickup:
                     self.vista.sprite_daga_pickup.recogida = False
+
+            # Restaurar boss: si estaba derrotado al guardar, matarlo en el modelo
+            if datos.get('boss_derrotado') and self.modelo.boss:
+                self.modelo.boss.vivo = False
 
             self.vista.sprite_checkpoint.activar()
             print("[Presenter] ✓ Partida cargada")
