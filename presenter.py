@@ -17,7 +17,7 @@ from SaveManager import SaveManager
 from MenuPausa   import MenuPausa
 from model import BossModel
 from model.Enemigo1Model import Enemigo1Model
-
+from MenuConfig import MenuConfig
 
 class JuegoPresenter:
     """Coordinador central que conecta Model y View.
@@ -125,9 +125,21 @@ class JuegoPresenter:
                 self.salida_forzada = True; return
             accion = self._menu_pausa.procesar_evento(event)
             if accion is None: continue
-            if accion == 'reanudar':      self._pausado = False
-            elif accion == 'cargar':      self._cargar_partida(); self._pausado = False
-            elif accion == 'menu_principal': self.ejecutando = False; self._pausado = False
+            if accion == 'reanudar':
+                self._pausado = False
+            elif accion == 'cargar':
+                self._cargar_partida(); self._pausado = False
+            elif accion == 'config':
+                MenuConfig(self.vista.screen, self.audio).ejecutar()
+                # Redibujar: primero el juego congelado, luego la pausa encima
+                estado_jugador = self.vista.obtener_estado_jugador(self.modelo)
+                estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
+                self.vista.renderizar(estado_jugador, estados_enemigos, self.modelo)
+                hover = self._menu_pausa.hover_idx(pygame.mouse.get_pos())
+                self._menu_pausa.dibujar(hover)
+                pygame.display.flip()
+            elif accion == 'menu_principal':
+                self.ejecutando = False; self._pausado = False
         self._menu_pausa.dibujar(hover)
         pygame.display.flip()
 

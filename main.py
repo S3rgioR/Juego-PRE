@@ -204,7 +204,7 @@ def main():
         if not pygame.mixer.music.get_busy():  # ← AÑADIR
             audio.reproducir_musica("Assets/Audio/Music/Goblins_Den_(Regular).wav")
         menu   = MenuPrincipal(screen=pygame.display.get_surface(),
-                               tiene_save=save_manager.existe())
+                               tiene_save=save_manager.existe(), audio=audio)
         accion = menu.ejecutar()
 
         if accion == 'salir':
