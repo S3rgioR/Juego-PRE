@@ -12,6 +12,8 @@ Diseño:
 
 import pygame
 import Constantes
+from MenuConfig import MenuConfig
+
 from view.AudioManager import AudioManager
 
 # ── Paleta ──────────────────────────────────────────────────────────────────
@@ -50,11 +52,12 @@ class MenuPrincipal:
     BTN_GAP    = 18       # separación entre botones
     BTN_RADIO  = 8        # redondeo de esquinas
 
-    def __init__(self, screen: pygame.Surface, tiene_save: bool = False,
-                 fondo_path: str = "Assets/Enviorments/caverns-files-web/layers/background.png"):
+    def __init__(self, screen: pygame.Surface, tiene_save: bool = False, audio=None,
+                 fondo_path: str = "Assets/Enviorments/caverns-files-web/layers/background.png",):
         self.screen     = screen
         self.tiene_save = tiene_save
         self.seleccion  = 0   # índice del botón resaltado con teclado
+        self._audio = audio
 
         # Fuentes
         self._fuente_titulo = pygame.font.SysFont(None, 96)
@@ -207,7 +210,11 @@ class MenuPrincipal:
                     elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                         accion = self.OPCIONES[self.seleccion][0]
                         if not self._esta_deshabilitado(accion):
-                            return accion
+                            if accion == 'config':
+                                MenuConfig(self.screen, self._audio).ejecutar()  # abre y vuelve
+
+                            else:
+                                return accion
 
                 # Ratón: hover
                 elif event.type == pygame.MOUSEMOTION:
@@ -224,7 +231,10 @@ class MenuPrincipal:
                     ):
                         if rect.collidepoint(event.pos):
                             if not self._esta_deshabilitado(accion):
-                                return accion
+                                if accion == 'config':
+                                    MenuConfig(self.screen, self._audio).ejecutar()
+                                else:
+                                    return accion
 
             # ── Render ──
             self._dibujar(hover_idx)
