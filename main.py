@@ -10,7 +10,7 @@ from Nivel         import NIVELES
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
 from view.AudioManager import AudioManager
-
+from view.PortalView import PortalView
 
 def escalar_img(image, scale):
     w, h = image.get_width(), image.get_height()
@@ -70,7 +70,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         num_nivel = 1
 
     nivel_loader, datos_nivel = NIVELES[num_nivel]
-
+    datos_portal_regreso = datos_nivel.get('portal_regreso', None)
     s = Constantes.SCALA_PERSONAJE
 
     # --- Dimensiones del personaje (antes de set_mode) ---
@@ -155,8 +155,9 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         imagen_daga_pickup    = img_daga_pickup,
         datos_daga_pickup     = datos_daga_pickup,
         frames_daga_proyectil = frames_daga_proyectil,
-        datos_fin_nivel=datos_fin_nivel,
-        datos_spawn    =datos_spawn,
+        datos_fin_nivel       =datos_fin_nivel,
+        datos_spawn           =datos_spawn,
+        datos_portal_regreso  =datos_portal_regreso,
     )
 
     presenter = JuegoPresenter(
@@ -216,9 +217,10 @@ def main():
                     num_nivel = presenter.num_nivel
                     continue
                 if presenter.nivel_completado:
+                    num_nivel += 1
                     estado_jugador_previo = presenter.modelo.obtener_estado_guardado()
                     estado_jugador_previo['daga_desbloqueada'] = presenter.modelo.jugador.daga_desbloqueada
-                    num_nivel += 1
+
                     pygame.mixer.music.stop()
                 else:
                     break  # volvió al menú sin completar

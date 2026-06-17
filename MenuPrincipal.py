@@ -12,7 +12,7 @@ Diseño:
 
 import pygame
 import Constantes
-
+from view.AudioManager import AudioManager
 
 # ── Paleta ──────────────────────────────────────────────────────────────────
 COLOR_FONDO_OVERLAY = (10, 10, 30, 200)   # capa semitransparente sobre el fondo
@@ -183,6 +183,7 @@ class MenuPrincipal:
         """
         reloj     = pygame.time.Clock()
         hover_idx = -1   # índice del botón bajo el ratón (-1 = ninguno)
+
 
         while True:
             reloj.tick(60)

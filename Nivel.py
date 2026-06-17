@@ -56,13 +56,13 @@ DATOS_NIVEL_1 = {
     'boss': None,
 
     'angel':      tp(5, 30),
-    'corazones': [tp(145, 38), tp(150, 21)],
+    'corazones': [tp(145, 38), tp(140, 21)],
     'daga_pickup': tp(10, 28),
 
     'fin_nivel': {
         **tp(150, 21),
-        'ancho': 40,
-        'alto':  200,
+        'ancho': 5,
+        'alto':  5,
     },
 }
 
@@ -100,13 +100,18 @@ DATOS_NIVEL_2 = {
     },
 
     'angel':       tp(4, 16),
+    'portal_regreso': {
+    **tp(2, 2),      # al inicio del nivel, junto al ángel
+    'ancho': 5,
+    'alto':  5,
+    },
     'corazones':   [tp(15, 27)],
     'daga_pickup': None,
 
     'fin_nivel': {
         **tp(660, 0),
-        'ancho': 40,
-        'alto':  200,
+        'ancho': 5,
+        'alto':  5,
     },
 }
 

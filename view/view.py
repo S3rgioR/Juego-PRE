@@ -51,7 +51,7 @@ from .BossSprite         import BossSprite
 from .BloodEffect        import BloodEffect
 from .ExplosionEffect    import ExplosionEffect
 from .HitEffect          import HitEffect
-
+from .PortalView import PortalView
 
 class PygameView:
     """Gestiona física, entrada, cámara, sprites y renderizado del juego.
@@ -79,7 +79,8 @@ class PygameView:
                  imagen_daga_pickup=None, datos_daga_pickup=None,
                  datos_spawn=None,
                  frames_daga_proyectil=None,
-                 datos_fin_nivel=None):
+                 datos_fin_nivel=None,
+                 datos_portal_regreso=None):
         """
         Parámetros nuevos
         -----------------
@@ -126,6 +127,36 @@ class PygameView:
             frames_proyectil.append(pygame.transform.scale(
                 img, (int(img.get_width() * escala_proj),
                       int(img.get_height() * escala_proj))))
+
+        # Cargar frames del portal
+        self._frames_portal = []
+        for i in range(1, 65):
+            img = pygame.image.load(f"Assets/Efectos/Portal/portal_9/portal{i}.png").convert_alpha()
+            w, h = img.get_width(), img.get_height()
+            escala = Constantes.SCALA_PERSONAJE * 0.25
+            img = pygame.transform.scale(img, (int(w * escala), int(h * escala)))
+            self._frames_portal.append(img)
+
+
+        # Portal de avance (fin de nivel) — siempre presente si datos_fin_nivel existe
+        self.portal_fin = None
+        if datos_fin_nivel:
+            self.portal_fin = PortalView(
+                datos_fin_nivel['x'], datos_fin_nivel['y'],
+                self._frames_portal,
+                datos_fin_nivel.get('ancho', 1),
+                datos_fin_nivel.get('alto', 1),
+            )
+
+        # Portal de regreso (solo desde nivel 2 en adelante)
+        self.portal_regreso = None
+        if datos_portal_regreso:
+            self.portal_regreso = PortalView(
+                datos_portal_regreso['x'], datos_portal_regreso['y'],
+                self._frames_portal,
+                datos_portal_regreso.get('ancho', 1),
+                datos_portal_regreso.get('alto', 1),
+            )
 
         # --- Sprites jugador y enemigos ---
         # Posición inicial: desde datos_spawn del nivel, o fallback al borde izquierdo.
@@ -197,6 +228,9 @@ class PygameView:
         self.evt_corazon_recogido       = Event()   # emite el índice
         self.evt_daga_recogida          = Event()   # sin argumentos
         self.evt_lanzar_daga            = Event()   # sin argumentos
+        self.evt_nivel_anterior         = Event()
+        self.evt_tecla_e                = Event()
+
         self.audio = audio
 
         self.evt_nivel_completado = Event()
@@ -309,6 +343,8 @@ class PygameView:
                     self.evt_saltar.emit()
                     # El sonido de salto se dispara desde el Presenter
                     # NO llamar aquí para evitar doble disparo si el salto falla.
+                elif event.key == pygame.K_e:
+                    self.evt_tecla_e.emit()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -407,11 +443,15 @@ class PygameView:
 
             if self.audio and modelo.boss and modelo.boss.vivo:
                 self.audio.tick_rugido_boss()
+        # Portal de avance
+        if self.portal_fin:
+            cerca = self.portal_fin.esta_cerca(self.sprite_jugador.shape)
+            self.portal_fin.set_mostrar_prompt(cerca, "[E] Nivel siguiente")
 
-        # Trigger de fin de nivel
-        if (self._trigger_fin_nivel
-                and self.sprite_jugador.shape.colliderect(self._trigger_fin_nivel)):
-            self.evt_nivel_completado.emit()
+        # Portal de regreso
+        if self.portal_regreso:
+            cerca = self.portal_regreso.esta_cerca(self.sprite_jugador.shape)
+            self.portal_regreso.set_mostrar_prompt(cerca, "[E] Nivel anterior")
     # --- Mover proyectiles de daga del jugador ---
 
     def _mover_dagas_jugador(self, modelo):
@@ -747,20 +787,25 @@ class PygameView:
             efecto.draw(self.screen, self.camara)
         self._efectos_hit = [e for e in self._efectos_hit if not e.terminado]
 
+        # Portales (debajo del jugador para que queden en capa media)
+        if self.portal_fin:
+            self.portal_fin.draw(self.screen, self.camara)
+        if self.portal_regreso:
+            self.portal_regreso.draw(self.screen, self.camara)
+
         # Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)
 
         # 6. HUD
         self.dibujar_hud(estado_jugador)
 
-        # 7. Presentar frame
-        pygame.display.flip()
-
+        # Debug: trigger de fin de nivel (solo en desarrollo)
         if self._trigger_fin_nivel:
             pygame.draw.rect(self.screen, (0, 255, 100),
                              self.camara.aplicar(self._trigger_fin_nivel), 3)
 
-
+        # 7. Presentar frame
+        pygame.display.flip()
 
     def obtener_estado_jugador(self, modelo):
         """Construye el dict de estado del jugador combinando Model y Vista.

@@ -8,5 +8,6 @@ Exporta PygameView como punto de acceso principal.
 """
 
 from .view import PygameView
+from .PortalView import PortalView
 
 __all__ = ['PygameView']

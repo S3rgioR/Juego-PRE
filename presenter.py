@@ -78,9 +78,13 @@ class JuegoPresenter:
         self.vista.evt_corazon_recogido.add_listener(self._corazon_recogido)
         self.vista.evt_daga_recogida.add_listener(self._daga_recogida)
         self.vista.evt_lanzar_daga.add_listener(self._lanzar_daga)
+        self.vista.evt_nivel_anterior.add_listener(self._nivel_anterior)
+        self.vista.evt_tecla_e.add_listener(self._usar_portal)
 
         self.num_nivel = num_nivel
         self.nivel_completado = False
+        self.nivel_anterior = False
+
         self.vista.evt_nivel_completado.add_listener(self._nivel_completado)
 
     # --- Handlers de eventos ---
@@ -91,6 +95,10 @@ class JuegoPresenter:
     def _cerrar(self):
         self.ejecutando     = False
         self.salida_forzada = True
+
+    def _nivel_anterior(self):
+        self.nivel_anterior = True
+        self.ejecutando = False
 
     def _togglear_pausa(self):
         self._pausado = not self._pausado
@@ -114,6 +122,13 @@ class JuegoPresenter:
         self._menu_pausa.dibujar(hover)
         pygame.display.flip()
 
+    def _usar_portal(self):
+        shape = self.vista.sprite_jugador.shape
+
+        if self.vista.portal_fin and self.vista.portal_fin.esta_cerca(shape):
+            self._nivel_completado()
+        elif self.vista.portal_regreso and self.vista.portal_regreso.esta_cerca(shape):
+            self._nivel_anterior()
     def _saltar(self):  self.modelo.jugador_saltar()
     def _atacar(self):  self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
 
