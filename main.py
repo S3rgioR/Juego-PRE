@@ -198,7 +198,11 @@ def main():
     audio        = AudioManager()
     save_manager = SaveManager()
 
+    audio.reproducir_musica("Assets/Audio/Music/Goblins_Den_(Regular).wav")
+
     while True:
+        if not pygame.mixer.music.get_busy():  # ← AÑADIR
+            audio.reproducir_musica("Assets/Audio/Music/Goblins_Den_(Regular).wav")
         menu   = MenuPrincipal(screen=pygame.display.get_surface(),
                                tiene_save=save_manager.existe())
         accion = menu.ejecutar()
@@ -209,6 +213,7 @@ def main():
             num_nivel = 1
             estado_jugador_previo = None
             while num_nivel in NIVELES:
+                pygame.mixer.music.stop()
                 presenter = iniciar_partida(audio, num_nivel=num_nivel,
                                             estado_jugador_previo=estado_jugador_previo)
                 if presenter.salida_forzada:
@@ -259,6 +264,7 @@ def main():
                 pygame.mixer.music.stop()
 
         elif accion == 'cargar':
+            pygame.mixer.music.stop()
             # Leer el nivel del save antes de arrancar
             datos_save = save_manager.cargar()
             num_nivel_save = datos_save.get('num_nivel', 1) if datos_save else 1
