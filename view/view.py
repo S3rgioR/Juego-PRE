@@ -581,7 +581,8 @@ class PygameView:
 
             if isinstance(enemigo_m, Enemigo1Model):
                 # Enemigo terrestre: gravedad + patrulla
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas)
 
                 # Gravedad
                 enemigo_m.velocidad_y += Constantes.GRAVEDAD
@@ -615,7 +616,8 @@ class PygameView:
 
             else:
                 # Enemigo volador: solo patrulla horizontal, sin gravedad
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas)
                 sprite.shape.x += delta_x
 
     # --- Movimiento de proyectiles ---
