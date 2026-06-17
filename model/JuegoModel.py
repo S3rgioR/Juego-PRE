@@ -174,7 +174,7 @@ class JuegoModel:
         if 'hp_max' in datos:
             self.jugador.hp_max = max(JugadorModel.HP_MAX_BASE, int(datos['hp_max']))
         if 'hp' in datos:
-            self.jugador.hp   = max(1, min(int(datos['hp']), self.jugador.hp_max))
+            self.jugador.hp   = max(1, min(datos['hp'], self.jugador.hp_max))
             self.jugador.vivo = True
         # La daga se restaura desde el Presenter (que conoce el estado del mapa),
         # NO desde aquí. Aseguramos que siempre empieza desactivada al cargar.

@@ -84,6 +84,7 @@ class JuegoPresenter:
         self.num_nivel = num_nivel
         self.nivel_completado = False
         self.nivel_anterior = False
+        self.estado_jugador_al_retroceder = None
 
         self.vista.evt_nivel_completado.add_listener(self._nivel_completado)
 
@@ -97,6 +98,14 @@ class JuegoPresenter:
         self.salida_forzada = True
 
     def _nivel_anterior(self):
+        self.estado_jugador_al_retroceder = self.modelo.obtener_estado_guardado()
+        self.estado_jugador_al_retroceder['daga_desbloqueada'] = self.modelo.jugador.daga_desbloqueada
+        self.estado_jugador_al_retroceder['corazones_recogidos'] = self.vista.indices_corazones_recogidos()
+        self.estado_jugador_al_retroceder['daga_recogida'] = (
+                self.vista.sprite_daga_pickup is None
+                or self.vista.sprite_daga_pickup.recogida
+        )
+        self.estado_jugador_al_retroceder['pos'] = list(self.vista.sprite_jugador.shape.center)  # ← NUEVO
         self.nivel_anterior = True
         self.ejecutando = False
 
