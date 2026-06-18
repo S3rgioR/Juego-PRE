@@ -2,9 +2,15 @@
 
 Formato del archivo
 -------------------
-Una secuencia de enteros que alterna ANCHO y ESCALON:
+El archivo se divide en secciones, cada una entre corchetes `[ ]`:
 
-    ancho1  escalon1  ancho2  escalon2  ...
+    [ ancho1  escalon1  ancho2  escalon2 ... ]   ← primera secc.: poligono
+    [ columna  fila ]                            ← plataforma flotante 1
+    [ columna  fila ]                            ← plataforma flotante 2
+    ...
+
+El PRIMER bloque `[ ]` es siempre el polígono del terreno, con la
+secuencia de enteros que alterna ANCHO y ESCALON:
 
   - ancho   (posicion impar) : bloques horizontales.
                                +x suelo (tierra hacia la derecha)
@@ -14,6 +20,14 @@ Una secuencia de enteros que alterna ANCHO y ESCALON:
                                -y pared baja
 
 El mapa DEBE ser cerrado: el ultimo vertice debe coincidir con el primero.
+
+Cada bloque `[ ]` SIGUIENTE define una plataforma flotante: dos enteros,
+"columna fila" en coordenadas de tiles. La columna es la del tile MAS A
+LA DERECHA de la plataforma; esta se extiende 4 tiles hacia la izquierda
+(plataformas de 1 tile de alto x 4 de ancho). Son atravesables desde
+abajo: solo actuan como suelo si se cae sobre ellas desde arriba. Son
+opcionales: un nivel sin plataformas flotantes solo tiene el primer
+bloque `[ ]`.
 
 Tiles y cuando se usan
 -----------------------
@@ -66,9 +80,10 @@ Estrategia de relleno
 """
 
 import os
+import re
 import pygame
 import Constantes
-from view.Plataforma import Plataforma
+from view.Plataforma import Plataforma, PlataformaFlotante
 
 
 TILE_SIZE = 16
@@ -89,6 +104,15 @@ _TILES = {
     'techo_iz_ar':  pygame.Rect(64,  80, TILE_SIZE, TILE_SIZE),
 }
 
+# Tiles de la plataforma flotante: 4 tiles distintos, uno junto al otro
+# (no se repiten), formando una imagen de 4 tiles de ancho x 1 de alto.
+_TILES_PLATAFORMA_FLOTANTE = [
+    pygame.Rect(144, 0, TILE_SIZE, TILE_SIZE),
+    pygame.Rect(160, 0, TILE_SIZE, TILE_SIZE),
+    pygame.Rect(176, 0, TILE_SIZE, TILE_SIZE),
+    pygame.Rect(192, 0, TILE_SIZE, TILE_SIZE),
+]
+
 GROSOR_SUELO = TILE_SIZE
 GROSOR_PARED = TILE_SIZE
 GROSOR_TECHO = TILE_SIZE
@@ -104,24 +128,63 @@ class LevelParser:
     # -----------------------------------------------------------------------
 
     def cargar(self, ruta: str) -> list:
-        numeros   = self._leer_numeros(ruta)
-        segmentos = self._numeros_a_segmentos(numeros)
+        secciones = self._leer_secciones(ruta)
+        if not secciones:
+            raise ValueError(f"[LevelParser] '{ruta}' no contiene ninguna sección [ ].")
+
+        numeros_poligono = secciones[0]
+        segmentos = self._numeros_a_segmentos(numeros_poligono)
         self._verificar_cierre(segmentos, ruta)
-        return self._construir(segmentos)
+        plataformas = self._construir(segmentos)
+
+        for bloque in secciones[1:]:
+            plataformas.append(self._construir_plataforma_flotante(bloque, ruta))
+
+        return plataformas
 
     # -----------------------------------------------------------------------
     # Lectura
     # -----------------------------------------------------------------------
 
-    def _leer_numeros(self, ruta: str) -> list:
+    def _leer_secciones(self, ruta: str) -> list:
+        """Lee el archivo y devuelve una lista de secciones (listas de int).
+
+        Cada sección es el contenido de un bloque `[ ... ]`. Los comentarios
+        con '#' se descartan línea a línea antes de buscar los corchetes, así
+        que pueden usarse libremente dentro o fuera de un bloque.
+        """
         ruta_abs = os.path.join(os.path.dirname(os.path.abspath(__file__)), ruta)
         with open(ruta_abs, 'r', encoding='utf-8') as f:
             lineas = f.readlines()
-        tokens = []
-        for linea in lineas:
-            linea = linea.split('#')[0].strip()
-            tokens.extend(linea.split())
-        return [int(t) for t in tokens if t]
+
+        sin_comentarios = ' '.join(linea.split('#')[0] for linea in lineas)
+
+        # Eliminar secciones con prefijo conocido (P.Boss:, etc.)
+        # para que no se confundan con plataformas flotantes
+        sin_comentarios = re.sub(r'P\.Boss\s*:\s*\[[^\]]*\]', '', sin_comentarios)
+
+        secciones = []
+        for bloque in re.findall(r'\[([^\]]*)\]', sin_comentarios):
+            numeros = [int(t) for t in bloque.split() if t]
+            secciones.append(numeros)
+        return secciones
+
+    def _construir_plataforma_flotante(self, bloque: list, ruta: str) -> PlataformaFlotante:
+        """Construye una PlataformaFlotante a partir de un bloque [columna fila].
+
+        `columna` es el tile MAS A LA DERECHA de la plataforma; esta se
+        extiende 4 tiles hacia la izquierda.
+        """
+        if len(bloque) != 2:
+            raise ValueError(
+                f"[LevelParser] '{ruta}': plataforma flotante mal formada {bloque}. "
+                f"Se esperan exactamente 2 numeros: [columna fila]."
+            )
+        columna, fila = bloque
+        ancho_tiles = len(_TILES_PLATAFORMA_FLOTANTE)
+        x = (columna - (ancho_tiles - 1)) * TILE_SIZE
+        y = Constantes.SUELO_Y - fila * TILE_SIZE
+        return PlataformaFlotante(x, y, self.tileset, _TILES_PLATAFORMA_FLOTANTE)
 
     def _numeros_a_segmentos(self, numeros: list) -> list:
         cx, cy = 0, 0
@@ -285,6 +348,31 @@ class LevelParser:
             if abs(c - resultado[-1]) > tolerancia:
                 resultado.append(c)
         return resultado
+
+    def cargar_pared_boss(self, ruta: str):
+        import os, re
+        import Constantes
+        ruta_abs = os.path.join(os.path.dirname(os.path.abspath(__file__)), ruta)
+        with open(ruta_abs, 'r', encoding='utf-8') as f:
+            contenido = f.read()
+
+        m = re.search(r'P\.Boss\s*:\s*\[([^\]]*)\]', contenido)
+        if not m:
+            return None
+
+        nums = [int(t) for t in m.group(1).split() if t]
+        if len(nums) != 2:
+            raise ValueError(
+                f"[LevelParser] P.Boss en '{ruta}' necesita exactamente 2 números: "
+                f"[tx  ty], se encontraron {len(nums)}: {nums}"
+            )
+        tx, ty = nums
+        tile = max(1, Constantes.WIDTH_PERSONAJE)
+        ancho = tile  # 1 tile de ancho
+        alto = tile * 5  # 6 tiles de alto
+        x = tx * tile
+        y = Constantes.SUELO_Y - ty * tile - alto  # borde superior de la pared
+        return {'x': x, 'y': y, 'ancho': ancho, 'alto': alto}
 
     def _rangos_exterior(self, cortes, y_min, y_max):
         rangos = []

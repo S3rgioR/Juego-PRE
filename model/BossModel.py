@@ -78,7 +78,7 @@ class BossModel(Actor):
 
     on_disparo = staticmethod(lambda: None)  # sobreescrito por el Presenter si hay audio
 
-    HP_MAX = 2
+    HP_MAX = 16
 
     # Distancias / velocidades
     DIST_ATAQUE       = 350   # px horizontal para empezar a atacar
@@ -103,7 +103,7 @@ class BossModel(Actor):
     # Embestida
     VEL_BAJAR      = 5
     VEL_EMBESTIDA  = 11
-    OVERSHOOT_PX   = 130
+    OVERSHOOT_PX   = 230
     VEL_SUBIR      = 3
     PAUSA_PASAR_MS = 350   # tiempo inmóvil tras pasarse
 
