@@ -18,7 +18,7 @@ class Enemigo1Model(Actor):
 
         self.rango_vision    = 250   # px — rango en el que detecta al jugador
         self.rango_ataque    = 100   # px — distancia a la que ataca
-        self.cooldown_ataque = 1200
+        self.cooldown_ataque = 2500
         self.ultimo_ataque   = -self.cooldown_ataque
 
         self._frame_index       = 0
@@ -32,6 +32,7 @@ class Enemigo1Model(Actor):
         self.persiguiendo          = False   # True mientras sigue al jugador
         self._exclamacion_nueva    = False   # True solo el frame que detecta
         self.velocidad_persecucion = 3       # px/frame al perseguir
+        self._alertado_por_golpe   = False   # True el frame en que recibe un golpe
 
     # --- IA ---
 
@@ -43,30 +44,51 @@ class Enemigo1Model(Actor):
         self._exclamacion_nueva = False
 
         ex, ey = pos_enemigo
-        jx, _  = pos_jugador
+        jx, jy = pos_jugador
         dx     = jx - ex
+        dy     = jy - ey
         dist   = abs(dx)
 
+        # Detección visual: solo si el jugador está en el lado al que mira
+        # y en una Y similar (mismo nivel de plataforma aprox.)
+        jugador_en_frente  = (dx < 0) if self.flip else (dx > 0)
+        mismo_nivel_y      = abs(dy) <= Constantes.HEIGHT_PERSONAJE * 4
         ve_al_jugador = (
             dist <= self.rango_vision
+            and jugador_en_frente
+            and mismo_nivel_y
             and not self._hay_pared_entre(pos_enemigo, pos_jugador, tiles_solidos)
         )
 
-        # Transición patrulla → persecución
+        # Alerta por golpe: girar hacia el jugador y entrar en modo alerta
+        # NO se fuerza persiguiendo aquí — se gestiona abajo junto al resto
+        if self._alertado_por_golpe:
+            self._alertado_por_golpe = False
+            if not self.atacando:          # no interrumpir un ataque en curso
+                self.flip = dx < 0
+            if not self.persiguiendo:
+                self.persiguiendo       = True
+                self._exclamacion_nueva = True
+                if hasattr(self, 'on_deteccion'):
+                    self.on_deteccion()
+
+        # Transición patrulla → persecución (detección visual frontal)
         if ve_al_jugador and not self.persiguiendo:
             self.persiguiendo       = True
             self._exclamacion_nueva = True
             if hasattr(self, 'on_deteccion'):
                 self.on_deteccion()
 
-        # Transición persecución → patrulla
-        if self.persiguiendo and not ve_al_jugador:
+        # Transición persecución → patrulla:
+        # En modo alerta conoce la posición del jugador aunque esté de espaldas,
+        # pero deja de perseguir si el jugador se aleja más del rango de visión.
+        if self.persiguiendo and dist > self.rango_vision:
             self.persiguiendo = False
 
         ahora          = pygame.time.get_ticks()
         cooldown_listo = (ahora - self.ultimo_ataque) >= self.cooldown_ataque
 
-        # Atacar si está en rango de ataque y persiguiendo
+        # Atacar si está en rango de ataque, persiguiendo Y cooldown listo
         en_rango_ataque = self.persiguiendo and dist <= self.rango_ataque
         if en_rango_ataque and cooldown_listo and not self.atacando:
             self.atacando      = True
@@ -78,7 +100,7 @@ class Enemigo1Model(Actor):
         if not self.atacando:
             self.hitbox_ataque = None
             if self.persiguiendo:
-                # Perseguir: moverse hacia el jugador
+                # En modo alerta siempre sabe dónde está el jugador: actualizar flip
                 self.flip = dx < 0
                 delta_x   = -self.velocidad_persecucion if self.flip else self.velocidad_persecucion
             else:
@@ -104,6 +126,13 @@ class Enemigo1Model(Actor):
                 self.hitbox_ataque = None
 
         return delta_x, self.hitbox_ataque
+
+    def recibir_daño(self, cantidad):
+        """Marca el flag para que tick_ia gire y persiga al atacante."""
+        ya_persiguiendo = self.persiguiendo
+        super().recibir_daño(cantidad)
+        if self.vivo and not ya_persiguiendo:
+            self._alertado_por_golpe = True
 
     def _hay_pared_entre(self, pos_a, pos_b, tiles):
         if not tiles:
