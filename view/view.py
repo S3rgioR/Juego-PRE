@@ -117,6 +117,13 @@ class PygameView:
         ).convert_alpha()
         self.sprites_plataformas = nivel_loader(tileset)
 
+        # Subconjunto solido (sin las plataformas flotantes): los enemigos
+        # las ignoran por completo, tanto para gravedad como para detectar
+        # bordes de patrulla.
+        self.sprites_plataformas_solidas = [
+            p for p in self.sprites_plataformas if not p.unidireccional
+        ]
+
         # --- Proyectiles de enemigos ---
         escala_proj = Constantes.SCALA_PERSONAJE * 0.6
         frames_proyectil = []
@@ -526,6 +533,8 @@ class PygameView:
         delta_x = modelo.delta_x_jugador
         shape.x += delta_x
         for plat in self.sprites_plataformas:
+            if plat.unidireccional:
+                continue  # las plataformas flotantes no bloquean lateralmente
             if shape.colliderect(plat.shape):
                 if delta_x > 0:  shape.right = plat.shape.left
                 elif delta_x < 0: shape.left  = plat.shape.right
@@ -534,22 +543,40 @@ class PygameView:
         # Se acumula en float para evitar errores de truncado con velocidades
         # menores a 1 px/frame. El +1 fuerza solapamiento en colliderect
         # incluso cuando la velocidad real es 0 (ver comentario en model original).
+        prev_bottom = shape.bottom  # posicion antes de moverse: referencia para
+                                     # decidir si una plataforma flotante debe
+                                     # actuar como suelo (solo si veniamos de arriba)
+
         jugador_m._y  = getattr(jugador_m, '_y', float(shape.y))
         jugador_m._y += jugador_m.velocidad_y
         shape.y        = int(jugador_m._y) + 1
 
         tocando_suelo = False
         for plat in self.sprites_plataformas:
-            if shape.colliderect(plat.shape):
-                if jugador_m.velocidad_y >= 0:
+            if not shape.colliderect(plat.shape):
+                continue
+
+            if plat.unidireccional:
+                # Plataforma flotante: solo bloquea si caemos sobre ella
+                # desde arriba (antes de moverse, los pies estaban a la
+                # altura de su superficie o por encima). Si venimos de
+                # abajo saltando, o ya estabamos debajo, se atraviesa.
+                if jugador_m.velocidad_y >= 0 and prev_bottom <= plat.shape.top:
                     shape.bottom  = plat.shape.top
                     jugador_m._y  = float(shape.y)
                     tocando_suelo = True
                     jugador_m.notificar_en_suelo()
-                else:
-                    shape.top    = plat.shape.bottom
-                    jugador_m._y = float(shape.y)
-                    jugador_m.notificar_golpe_techo()
+                continue
+
+            if jugador_m.velocidad_y >= 0:
+                shape.bottom  = plat.shape.top
+                jugador_m._y  = float(shape.y)
+                tocando_suelo = True
+                jugador_m.notificar_en_suelo()
+            else:
+                shape.top    = plat.shape.bottom
+                jugador_m._y = float(shape.y)
+                jugador_m.notificar_golpe_techo()
 
         if not tocando_suelo:
             jugador_m.notificar_en_aire(delta_time_ms)
@@ -581,16 +608,30 @@ class PygameView:
 
             if isinstance(enemigo_m, Enemigo1Model):
                 # Enemigo terrestre: gravedad + patrulla
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                # (las plataformas flotantes se ignoran: son solo para el jugador)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas_solidas)
 
                 # Gravedad
                 enemigo_m.velocidad_y += Constantes.GRAVEDAD
                 if enemigo_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
                     enemigo_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
+                # Borde de plataforma: si no hay suelo adelante, invertir dirección
+                # Se aplica siempre, tanto en patrulla como en modo alerta.
+                if delta_x != 0 and enemigo_m.en_suelo:
+                    pie_x = (sprite.shape.right + 2) if delta_x > 0 else (sprite.shape.left - 3)
+                    sonda = pygame.Rect(pie_x, sprite.shape.bottom, 2, 6)
+                    hay_suelo = any(sonda.colliderect(p.shape) for p in self.sprites_plataformas_solidas)
+                    if not hay_suelo:
+                        # Invertir: el ogro se da la vuelta y vuelve a patrullar
+                        enemigo_m.flip        = not enemigo_m.flip
+                        enemigo_m.persiguiendo = False
+                        delta_x               = -delta_x
+
                 # Horizontal
                 sprite.shape.x += delta_x
-                for plat in self.sprites_plataformas:
+                for plat in self.sprites_plataformas_solidas:
                     if sprite.shape.colliderect(plat.shape):
                         if delta_x > 0:
                             sprite.shape.right = plat.shape.left; enemigo_m.flip = True
@@ -600,7 +641,7 @@ class PygameView:
                 # Vertical
                 sprite.shape.y += int(enemigo_m.velocidad_y)
                 tocando_suelo = False
-                for plat in self.sprites_plataformas:
+                for plat in self.sprites_plataformas_solidas:
                     if sprite.shape.colliderect(plat.shape):
                         if enemigo_m.velocidad_y >= 0:
                             sprite.shape.bottom = plat.shape.top
@@ -615,7 +656,9 @@ class PygameView:
 
             else:
                 # Enemigo volador: solo patrulla horizontal, sin gravedad
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                # (las plataformas flotantes se ignoran: son solo para el jugador)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas_solidas)
                 sprite.shape.x += delta_x
 
     # --- Movimiento de proyectiles ---

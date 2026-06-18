@@ -25,7 +25,7 @@ DATOS_NIVEL_1 = {
         },
         {
             'tipo':               'terrestre',
-            **tp(2, 15),
+            **tp(1, 20),
             'distancia_patrulla': tiles_to_px(10),
             'num_frames_ataque':  6,
         },

@@ -1,6 +1,11 @@
 # Nivel 2 — Poligono cerrado
 #
+# Mismo formato que nivel1.txt: secciones [ ]. La primera es el poligono,
+# las siguientes (opcionales) son plataformas flotantes "[columna fila]".
 
 # --- suelo ---
 
-18 9 12 6 12 15 -12 3 21 6 21 -6 9 -3 -9 -15 9 -6 2 -9 100 60 -78 -39 -24 3 9 36 -90 -12 27 -3 -27 -21 27 -3 -27 -21
+[18 9 12 6 12 15 -12 3 21 6 21 -6 9 -3 -9 -15 9 -6 2 -9 100 60 -78 -39 -24 3 9 36 -90 -12 27 -3 -27 -21 27 -3 -27 -21]
+
+# --- plataformas flotantes ---
+# [60 25]
