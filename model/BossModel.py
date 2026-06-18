@@ -78,7 +78,7 @@ class BossModel(Actor):
 
     on_disparo = staticmethod(lambda: None)  # sobreescrito por el Presenter si hay audio
 
-    HP_MAX = 2
+    HP_MAX = 16
 
     # Distancias / velocidades
     DIST_ATAQUE       = 350   # px horizontal para empezar a atacar

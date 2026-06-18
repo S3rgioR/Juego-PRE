@@ -117,7 +117,7 @@ DATOS_NIVEL_2 = {
 
     'angel':      tp(5, 30),
     'portal_regreso': {
-        **tp(2, 2),      # al inicio del nivel, junto al ángel
+        **tp(2, 2),
         'ancho': 5,
         'alto':  5,
     },
@@ -134,7 +134,32 @@ DATOS_NIVEL_2 = {
 
 def cargar_nivel_2(tileset: pygame.Surface) -> list:
     return LevelParser(tileset).cargar('levels/nivel2.txt')
+DATOS_NIVEL_3 = {
+    'spawn':      tp_abs(10, 3),          # posición de aparición del jugador
+    'checkpoint': None,
+    'musica':     'Assets/Audio/Music/Boss_Battle_Sequence.wav',
 
+    'enemigos': [],
+
+    'boss': tp(50, 8),
+
+    'angel':      None,
+    'portal_regreso': {
+        **tp(2, 2),
+        'ancho': 5,
+        'alto':  5,
+    },
+    'corazones': None,
+    'daga_pickup': None,
+
+    'fin_nivel': {
+        **tp(230, 5),
+        'ancho': 5,
+        'alto':  5,
+    },
+}
+def cargar_nivel_3(tileset: pygame.Surface) -> list:
+    return LevelParser(tileset).cargar('levels/nivel3.txt')
 
 # ===========================================================================
 # Registro de niveles
@@ -142,4 +167,5 @@ def cargar_nivel_2(tileset: pygame.Surface) -> list:
 NIVELES = {
     1: (cargar_nivel_1, DATOS_NIVEL_1),
     2: (cargar_nivel_2, DATOS_NIVEL_2),
+    3: (cargar_nivel_3, DATOS_NIVEL_3),
 }

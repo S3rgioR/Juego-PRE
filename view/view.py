@@ -203,9 +203,10 @@ class PygameView:
             Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
 
         # --- Ángel curador ---
-        pos_angel = (datos_angel['x'], datos_angel['y']) if datos_angel else (2200, 400)
-        self.sprite_angel = AngelView(pos_angel[0], pos_angel[1], frames_angel or [])
-
+        if datos_angel:
+            self.sprite_angel = AngelView(datos_angel['x'], datos_angel['y'], frames_angel or [])
+        else:
+            self.sprite_angel = None
         # --- Corazones ---
         self.sprites_corazones = []
         if imagen_corazon and datos_corazones:
@@ -341,7 +342,7 @@ class PygameView:
                 elif event.key == pygame.K_j:
                     self.evt_atacar.emit()
                 elif event.key == pygame.K_k:
-                    if self.sprite_angel.esta_cerca(self.sprite_jugador.shape):
+                    if self.sprite_angel and self.sprite_angel.esta_cerca(self.sprite_jugador.shape):
                         self.evt_curar.emit()
                     elif self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
                         self.evt_guardar.emit()
@@ -782,9 +783,10 @@ class PygameView:
         self.sprite_checkpoint.draw(self.screen, self.camara)
 
         # Ángel
-        cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
-        self.sprite_angel.set_mostrar_prompt(cerca_angel)
-        self.sprite_angel.draw(self.screen, self.camara)
+        if self.sprite_angel:
+            cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
+            self.sprite_angel.set_mostrar_prompt(cerca_angel)
+            self.sprite_angel.draw(self.screen, self.camara)
 
         # Corazones
         for corazon in self.sprites_corazones:
