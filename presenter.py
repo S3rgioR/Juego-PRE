@@ -17,6 +17,8 @@ from SaveManager import SaveManager
 from MenuPausa   import MenuPausa
 from model import BossModel
 from model.Enemigo1Model import Enemigo1Model
+from model.Enemigo2Model import Enemigo2Model
+
 from MenuConfig import MenuConfig
 
 class JuegoPresenter:
@@ -45,6 +47,9 @@ class JuegoPresenter:
             Enemigo1Model.on_ataque = audio.sfx_ataque_ogro
         if audio:
             BossModel.on_disparo = audio.sfx_ataque_boss
+        if audio:
+            Enemigo1Model.on_deteccion = audio.sfx_deteccion_enemigo
+            Enemigo2Model.on_deteccion = audio.sfx_deteccion_enemigo
         self.modelo     = modelo
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador

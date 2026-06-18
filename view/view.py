@@ -581,12 +581,25 @@ class PygameView:
 
             if isinstance(enemigo_m, Enemigo1Model):
                 # Enemigo terrestre: gravedad + patrulla
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas)
 
                 # Gravedad
                 enemigo_m.velocidad_y += Constantes.GRAVEDAD
                 if enemigo_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
                     enemigo_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
+
+                # Borde de plataforma: si no hay suelo adelante, invertir dirección
+                # Se aplica siempre, tanto en patrulla como en modo alerta.
+                if delta_x != 0 and enemigo_m.en_suelo:
+                    pie_x = (sprite.shape.right + 2) if delta_x > 0 else (sprite.shape.left - 3)
+                    sonda = pygame.Rect(pie_x, sprite.shape.bottom, 2, 6)
+                    hay_suelo = any(sonda.colliderect(p.shape) for p in self.sprites_plataformas)
+                    if not hay_suelo:
+                        # Invertir: el ogro se da la vuelta y vuelve a patrullar
+                        enemigo_m.flip        = not enemigo_m.flip
+                        enemigo_m.persiguiendo = False
+                        delta_x               = -delta_x
 
                 # Horizontal
                 sprite.shape.x += delta_x
@@ -615,7 +628,8 @@ class PygameView:
 
             else:
                 # Enemigo volador: solo patrulla horizontal, sin gravedad
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas)
                 sprite.shape.x += delta_x
 
     # --- Movimiento de proyectiles ---

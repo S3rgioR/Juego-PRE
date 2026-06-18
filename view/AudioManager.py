@@ -122,6 +122,7 @@ class AudioManager:
             'muerte_enemigo2': 'Assets/Audio/Ogro/enemy-death.wav',
             'muerte_boss':     'Assets/Audio/Boss/evil-laugh.mp3',
             'ataque_boss':     'Assets/Audio/Boss/explosion.wav',
+            'deteccion_enemigo': 'Assets/Audio/Ogro/Detection.wav',
             'hurt_jugador':    'Assets/Audio/Player/hurt.ogg'
         }
         for clave, ruta in mapa.items():
@@ -159,7 +160,8 @@ class AudioManager:
     # ------------------------------------------------------------------
     # Música de fondo
     # ------------------------------------------------------------------
-
+    def sfx_deteccion_enemigo(self):
+        self._reproducir('deteccion_enemigo')
     def reproducir_musica(self, ruta: str, loops: int = -1, fade_ms: int = 1000):
         """Carga y reproduce música de fondo en bucle.
 
