@@ -52,6 +52,9 @@ from .BloodEffect        import BloodEffect
 from .ExplosionEffect    import ExplosionEffect
 from .HitEffect          import HitEffect
 from .PortalView import PortalView
+from .ParedBossView import ParedBossView
+from .PortalFinalView    import PortalFinalView
+from .FinDeJuegoSequence import FinDeJuegoSequence
 
 class PygameView:
     """Gestiona física, entrada, cámara, sprites y renderizado del juego.
@@ -78,8 +81,11 @@ class PygameView:
                  imagen_corazon=None, datos_corazones=None,
                  imagen_daga_pickup=None, datos_daga_pickup=None,
                  datos_spawn=None,
+                 datos_checkpoint=None,
                  frames_daga_proyectil=None,
+                 datos_pared_boss=None,
                  datos_fin_nivel=None,
+                 datos_portal_final=None,
                  datos_portal_regreso=None):
         """
         Parámetros nuevos
@@ -98,6 +104,9 @@ class PygameView:
         self.reloj  = pygame.time.Clock()
         self.camara = Camara()
 
+        # --- Checkpoint ---
+        cx, cy = datos_checkpoint if datos_checkpoint else CHECKPOINT_NIVEL_1
+        self.sprite_checkpoint = CheckpointView(cx, cy)
         # --- Fondos ---
         fondo_raw = pygame.image.load(
             "Assets/Enviorments/caverns-files-web/layers/background.png"
@@ -117,6 +126,13 @@ class PygameView:
         ).convert_alpha()
         self.sprites_plataformas = nivel_loader(tileset)
 
+        # Subconjunto solido (sin las plataformas flotantes): los enemigos
+        # las ignoran por completo, tanto para gravedad como para detectar
+        # bordes de patrulla.
+        self.sprites_plataformas_solidas = [
+            p for p in self.sprites_plataformas if not p.unidireccional
+        ]
+
         # --- Proyectiles de enemigos ---
         escala_proj = Constantes.SCALA_PERSONAJE * 0.6
         frames_proyectil = []
@@ -130,6 +146,7 @@ class PygameView:
 
         # Cargar frames del portal
         self._frames_portal = []
+
         for i in range(1, 65):
             img = pygame.image.load(f"Assets/Efectos/Portal/portal_9/portal{i}.png").convert_alpha()
             w, h = img.get_width(), img.get_height()
@@ -137,7 +154,28 @@ class PygameView:
             img = pygame.transform.scale(img, (int(w * escala), int(h * escala)))
             self._frames_portal.append(img)
 
+        # --- Portal final de juego (7 frames propios) ---
+        self._frames_portal_final = []
+        ESCALA_PORTAL_FINAL = Constantes.SCALA_PERSONAJE * 0.5  # ← sube/baja este número para cambiar el tamaño
+        for i in range(1, 8):
+            img = pygame.image.load(
+                f"Assets/Efectos/Portal Final juego/Frames/portal1_frame_{i}.png"
+            ).convert_alpha()
+            w, h = img.get_width(), img.get_height()
+            img = pygame.transform.scale(
+                img, (int(w * ESCALA_PORTAL_FINAL), int(h * ESCALA_PORTAL_FINAL)))
+            self._frames_portal_final.append(img)
 
+        self.portal_final = None
+        self._seq_fin_juego = None
+        self._ultimo_delta_ms = 0
+        if datos_portal_final:
+            self.portal_final = PortalFinalView(
+                datos_portal_final['x'], datos_portal_final['y'],
+                self._frames_portal_final,
+                datos_portal_final.get('ancho', 1),
+                datos_portal_final.get('alto', 1),
+            )
         # Portal de avance (fin de nivel) — siempre presente si datos_fin_nivel existe
         self.portal_fin = None
         if datos_fin_nivel:
@@ -147,6 +185,7 @@ class PygameView:
                 datos_fin_nivel.get('ancho', 1),
                 datos_fin_nivel.get('alto', 1),
             )
+
 
         # Portal de regreso (solo desde nivel 2 en adelante)
         self.portal_regreso = None
@@ -175,6 +214,15 @@ class PygameView:
                 datos_boss['anim_fase1'], datos_boss['anim_fase2'])
             self.sprite_boss.proyectil_frames = frames_proyectil
 
+        # --- Pared del boss ---
+        self.pared_boss = None
+        if datos_pared_boss:
+            self.pared_boss = ParedBossView(
+                datos_pared_boss['x'],
+                datos_pared_boss['y'],
+                datos_pared_boss['ancho'],
+                datos_pared_boss['alto'],
+            )
         self.sprites_enemigos = []
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
@@ -192,9 +240,10 @@ class PygameView:
             Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
 
         # --- Ángel curador ---
-        pos_angel = (datos_angel['x'], datos_angel['y']) if datos_angel else (2200, 400)
-        self.sprite_angel = AngelView(pos_angel[0], pos_angel[1], frames_angel or [])
-
+        if datos_angel:
+            self.sprite_angel = AngelView(datos_angel['x'], datos_angel['y'], frames_angel or [])
+        else:
+            self.sprite_angel = None
         # --- Corazones ---
         self.sprites_corazones = []
         if imagen_corazon and datos_corazones:
@@ -235,6 +284,7 @@ class PygameView:
 
         self.evt_nivel_completado = Event()
 
+
         # Rect del trigger (None si el nivel no tiene salida)
         self._trigger_fin_nivel = None
         if datos_fin_nivel:
@@ -245,8 +295,7 @@ class PygameView:
                 datos_fin_nivel['alto'],
             )
 
-        # --- Checkpoint ---
-        self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
+
 
         # --- Efecto de sangre (muerte de enemigos) ---
         self._frames_blood = self._cargar_frames_blood()
@@ -331,7 +380,7 @@ class PygameView:
                 elif event.key == pygame.K_j:
                     self.evt_atacar.emit()
                 elif event.key == pygame.K_k:
-                    if self.sprite_angel.esta_cerca(self.sprite_jugador.shape):
+                    if self.sprite_angel and self.sprite_angel.esta_cerca(self.sprite_jugador.shape):
                         self.evt_curar.emit()
                     elif self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape):
                         self.evt_guardar.emit()
@@ -345,6 +394,9 @@ class PygameView:
                     # NO llamar aquí para evitar doble disparo si el salto falla.
                 elif event.key == pygame.K_e:
                     self.evt_tecla_e.emit()
+                    if (self.portal_final and self._seq_fin_juego is None
+                            and self.portal_final.esta_cerca(self.sprite_jugador.shape)):
+                        self.iniciar_fin_de_juego()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -381,6 +433,7 @@ class PygameView:
         self._detectar_combate(modelo)
         self._detectar_corazones(modelo)
         self._detectar_daga_pickup(modelo)     # ← recoger objeto daga
+        self._ultimo_delta_ms = delta_time_ms  # ← lo usa la secuencia de fin de juego
 
         hitbox_espada = (self._calcular_hitbox_ataque_jugador(
             self.sprite_jugador.shape, modelo.jugador.flip)
@@ -414,6 +467,10 @@ class PygameView:
                     if p.shape.colliderect(plat.shape):
                         p.vivo = False
                         break
+                plats_solidas = self.sprites_plataformas_solidas[:]
+                if self.pared_boss and self.pared_boss.activa:
+                    plats_solidas.append(self.pared_boss)
+
                 # Bloqueado por espada del jugador
                 if p.vivo and hitbox_espada and hitbox_espada.colliderect(p.shape):
                     p.vivo = False
@@ -438,6 +495,8 @@ class PygameView:
             # Detectar muerte del boss en este frame
             if not modelo.boss.vivo and not self._boss_muerte_disparada:
                 self._disparar_efectos_muerte_boss()
+                if self.pared_boss:  # ← añadir
+                    self.pared_boss.activa = False
 
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
 
@@ -452,6 +511,12 @@ class PygameView:
         if self.portal_regreso:
             cerca = self.portal_regreso.esta_cerca(self.sprite_jugador.shape)
             self.portal_regreso.set_mostrar_prompt(cerca, "[E] Nivel anterior")
+
+        # Portal final
+        if self.portal_final:
+            cerca = self.portal_final.esta_cerca(self.sprite_jugador.shape)
+            self.portal_final.set_mostrar_prompt(cerca, "[E] Fin del juego")
+            self.portal_final.actualizar(delta_time_ms)
     # --- Mover proyectiles de daga del jugador ---
 
     def _mover_dagas_jugador(self, modelo):
@@ -511,6 +576,29 @@ class PygameView:
                 corazon.recoger()
                 self.evt_corazon_recogido.emit(corazon.indice)
 
+    @property
+    def fin_juego_activado(self) -> bool:
+        return self._seq_fin_juego is not None
+
+    @property
+    def fin_de_juego_terminado(self) -> bool:
+        """True cuando la secuencia de fin de juego ya mostró los textos
+        y terminó de esperar: el Presenter debe usar esto para volver
+        al menú principal."""
+        return self._seq_fin_juego is not None and self._seq_fin_juego.terminado
+
+    def iniciar_fin_de_juego(self):
+        """Arranca la secuencia de fin de juego (fade a negro + textos).
+
+        La llama internamente esta misma clase cuando el jugador pulsa [E]
+        estando cerca del portal_final. A partir de aquí renderizar()
+        deja de dibujar el juego y solo muestra la secuencia.
+        """
+        if self._seq_fin_juego is None:
+            self._seq_fin_juego = FinDeJuegoSequence(self.screen)
+            if self.portal_final:
+                self.portal_final.set_mostrar_prompt(False)
+
     # --- Movimiento del jugador ---
 
     def _mover_jugador(self, modelo, delta_time_ms):
@@ -522,10 +610,17 @@ class PygameView:
         if jugador_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
             jugador_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
+        plats_activas = self.sprites_plataformas[:]
+        if self.pared_boss and self.pared_boss.activa:
+            plats_activas.append(self.pared_boss)
+
         # --- Movimiento horizontal ---
         delta_x = modelo.delta_x_jugador
         shape.x += delta_x
-        for plat in self.sprites_plataformas:
+
+        for plat in plats_activas:
+            if plat.unidireccional:
+                continue  # las plataformas flotantes no bloquean lateralmente
             if shape.colliderect(plat.shape):
                 if delta_x > 0:  shape.right = plat.shape.left
                 elif delta_x < 0: shape.left  = plat.shape.right
@@ -534,22 +629,40 @@ class PygameView:
         # Se acumula en float para evitar errores de truncado con velocidades
         # menores a 1 px/frame. El +1 fuerza solapamiento en colliderect
         # incluso cuando la velocidad real es 0 (ver comentario en model original).
+        prev_bottom = shape.bottom  # posicion antes de moverse: referencia para
+                                     # decidir si una plataforma flotante debe
+                                     # actuar como suelo (solo si veniamos de arriba)
+
         jugador_m._y  = getattr(jugador_m, '_y', float(shape.y))
         jugador_m._y += jugador_m.velocidad_y
         shape.y        = int(jugador_m._y) + 1
 
         tocando_suelo = False
-        for plat in self.sprites_plataformas:
-            if shape.colliderect(plat.shape):
-                if jugador_m.velocidad_y >= 0:
+        for plat in  plats_activas:
+            if not shape.colliderect(plat.shape):
+                continue
+
+            if plat.unidireccional:
+                # Plataforma flotante: solo bloquea si caemos sobre ella
+                # desde arriba (antes de moverse, los pies estaban a la
+                # altura de su superficie o por encima). Si venimos de
+                # abajo saltando, o ya estabamos debajo, se atraviesa.
+                if jugador_m.velocidad_y >= 0 and prev_bottom <= plat.shape.top:
                     shape.bottom  = plat.shape.top
                     jugador_m._y  = float(shape.y)
                     tocando_suelo = True
                     jugador_m.notificar_en_suelo()
-                else:
-                    shape.top    = plat.shape.bottom
-                    jugador_m._y = float(shape.y)
-                    jugador_m.notificar_golpe_techo()
+                continue
+
+            if jugador_m.velocidad_y >= 0:
+                shape.bottom  = plat.shape.top
+                jugador_m._y  = float(shape.y)
+                tocando_suelo = True
+                jugador_m.notificar_en_suelo()
+            else:
+                shape.top    = plat.shape.bottom
+                jugador_m._y = float(shape.y)
+                jugador_m.notificar_golpe_techo()
 
         if not tocando_suelo:
             jugador_m.notificar_en_aire(delta_time_ms)
@@ -581,16 +694,30 @@ class PygameView:
 
             if isinstance(enemigo_m, Enemigo1Model):
                 # Enemigo terrestre: gravedad + patrulla
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                # (las plataformas flotantes se ignoran: son solo para el jugador)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas_solidas)
 
                 # Gravedad
                 enemigo_m.velocidad_y += Constantes.GRAVEDAD
                 if enemigo_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
                     enemigo_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
+                # Borde de plataforma: si no hay suelo adelante, invertir dirección
+                # Se aplica siempre, tanto en patrulla como en modo alerta.
+                if delta_x != 0 and enemigo_m.en_suelo:
+                    pie_x = (sprite.shape.right + 2) if delta_x > 0 else (sprite.shape.left - 3)
+                    sonda = pygame.Rect(pie_x, sprite.shape.bottom, 2, 6)
+                    hay_suelo = any(sonda.colliderect(p.shape) for p in self.sprites_plataformas_solidas)
+                    if not hay_suelo:
+                        # Invertir: el ogro se da la vuelta y vuelve a patrullar
+                        enemigo_m.flip        = not enemigo_m.flip
+                        enemigo_m.persiguiendo = False
+                        delta_x               = -delta_x
+
                 # Horizontal
                 sprite.shape.x += delta_x
-                for plat in self.sprites_plataformas:
+                for plat in self.sprites_plataformas_solidas:
                     if sprite.shape.colliderect(plat.shape):
                         if delta_x > 0:
                             sprite.shape.right = plat.shape.left; enemigo_m.flip = True
@@ -600,7 +727,7 @@ class PygameView:
                 # Vertical
                 sprite.shape.y += int(enemigo_m.velocidad_y)
                 tocando_suelo = False
-                for plat in self.sprites_plataformas:
+                for plat in self.sprites_plataformas_solidas:
                     if sprite.shape.colliderect(plat.shape):
                         if enemigo_m.velocidad_y >= 0:
                             sprite.shape.bottom = plat.shape.top
@@ -615,7 +742,9 @@ class PygameView:
 
             else:
                 # Enemigo volador: solo patrulla horizontal, sin gravedad
-                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms)
+                # (las plataformas flotantes se ignoran: son solo para el jugador)
+                delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
+                                                tiles_solidos=self.sprites_plataformas_solidas)
                 sprite.shape.x += delta_x
 
     # --- Movimiento de proyectiles ---
@@ -730,15 +859,18 @@ class PygameView:
         for plat in self.sprites_plataformas:
             plat.draw(self.screen, self.camara)
 
+        if self.pared_boss and self.pared_boss.activa:
+            self.pared_boss.draw(self.screen, self.camara)
         # Checkpoint
         cerca_cp = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
         self.sprite_checkpoint.set_mostrar_prompt(cerca_cp)
         self.sprite_checkpoint.draw(self.screen, self.camara)
 
         # Ángel
-        cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
-        self.sprite_angel.set_mostrar_prompt(cerca_angel)
-        self.sprite_angel.draw(self.screen, self.camara)
+        if self.sprite_angel:
+            cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
+            self.sprite_angel.set_mostrar_prompt(cerca_angel)
+            self.sprite_angel.draw(self.screen, self.camara)
 
         # Corazones
         for corazon in self.sprites_corazones:
@@ -792,6 +924,19 @@ class PygameView:
             self.portal_fin.draw(self.screen, self.camara)
         if self.portal_regreso:
             self.portal_regreso.draw(self.screen, self.camara)
+
+        if self.portal_final:
+            self.portal_final.draw(self.screen, self.camara)
+
+        # Secuencia de fin de juego: toma el control total de la pantalla
+        # (fade a negro + textos). Mientras esté activa no se dibuja nada
+        # más encima (ni jugador, ni HUD), si no se verían flotando sobre
+        # el fundido a negro.
+        if self._seq_fin_juego:
+            self._seq_fin_juego.actualizar(self._ultimo_delta_ms)
+            self._seq_fin_juego.draw()
+            pygame.display.flip()
+            return
 
         # Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)

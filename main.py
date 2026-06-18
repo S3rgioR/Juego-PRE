@@ -10,8 +10,7 @@ from Nivel         import NIVELES
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
 from view.AudioManager import AudioManager
-from view.PortalView import PortalView
-
+from LevelParser import LevelParser
 def escalar_img(image, scale):
     w, h = image.get_width(), image.get_height()
     return pygame.transform.scale(image, (int(w * scale), int(h * scale)))
@@ -70,7 +69,20 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         num_nivel = 1
 
     nivel_loader, datos_nivel = NIVELES[num_nivel]
+    # --- Pared del boss (opcional, solo en niveles con boss) ---
+    from LevelParser import LevelParser as _LP
+    _lp_tmp = _LP.__new__(_LP)  # instancia sin tileset para solo leer el txt
+    datos_pared_boss = None
+    if datos_nivel.get('boss'):
+        # El tileset no importa aquí, solo leemos metadatos
+        tileset_tmp = pygame.image.load(
+            "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png"
+        ).convert_alpha()
+        datos_pared_boss = LevelParser(tileset_tmp).cargar_pared_boss(
+            f'levels/nivel{num_nivel}.txt'
+        )
     datos_portal_regreso = datos_nivel.get('portal_regreso', None)
+    datos_portal_final   = datos_nivel.get('portal_final', None)
     s = Constantes.SCALA_PERSONAJE
 
     # --- Dimensiones del personaje (antes de set_mode) ---
@@ -140,6 +152,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
 
     datos_fin_nivel = datos_nivel.get('fin_nivel', None)
     datos_spawn     = datos_nivel.get('spawn', None)
+    datos_checkpoint = datos_nivel.get('checkpoint')
 
     vista = PygameView(
         frames_jugador        = frames_jugador,
@@ -154,9 +167,13 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         imagen_daga_pickup    = img_daga_pickup,
         datos_daga_pickup     = datos_daga_pickup,
         frames_daga_proyectil = frames_daga_proyectil,
-        datos_fin_nivel       =datos_fin_nivel,
-        datos_spawn           =datos_spawn,
-        datos_portal_regreso  =datos_portal_regreso,
+        datos_fin_nivel       = datos_fin_nivel,
+        datos_spawn           = datos_spawn,
+        datos_checkpoint      = datos_checkpoint,
+        datos_pared_boss      = datos_pared_boss,
+        datos_portal_regreso  = datos_portal_regreso,
+        datos_portal_final    = datos_portal_final,
+
     )
 
     presenter = JuegoPresenter(
@@ -165,7 +182,6 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         audio=audio,
         num_nivel=num_nivel,
     )
-
     # Arrancar música del nivel (si no hay ya música sonando)
     musica = datos_nivel.get('musica', 'Assets/Audio/Music/Ambient_Lingering_Action.wav')
     if audio and not pygame.mixer.music.get_busy():
@@ -184,7 +200,9 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         if estado_jugador_previo.get('viene_de_retroceso') and 'pos_retroceso' in estado_jugador_previo:
             x, y = estado_jugador_previo['pos_retroceso']
             vista.restaurar_pos_jugador(int(x), int(y))
+
     presenter.ejecutar()
+
     return presenter
 
 
@@ -237,10 +255,8 @@ def main():
                     estado_jugador_previo['pos_retroceso'] = list(
                         presenter.vista.sprite_jugador.shape.center)
                     estado_jugador_previo['corazones_recogidos'] = presenter.vista.indices_corazones_recogidos()
-                    estado_jugador_previo['daga_recogida'] = (
-                            presenter.vista.sprite_daga_pickup is None
-                            or presenter.vista.sprite_daga_pickup.recogida
-                    )
+                    estado_jugador_previo['daga_recogida'] = estado_jugador_previo['daga_desbloqueada']
+
                     pygame.mixer.music.stop()
                 elif presenter.nivel_anterior and num_nivel > 1:
                     pos_retroceso_guardada = estado_jugador_previo.get(
@@ -263,6 +279,8 @@ def main():
                     break # volvió al menú sin completar
                 pygame.mixer.music.stop()
 
+                if presenter.juego_finalizado:
+                    break  # sale del while de niveles → vuelve al menú principal
         elif accion == 'cargar':
             pygame.mixer.music.stop()
             # Leer el nivel del save antes de arrancar
