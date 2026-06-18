@@ -140,6 +140,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
 
     datos_fin_nivel = datos_nivel.get('fin_nivel', None)
     datos_spawn     = datos_nivel.get('spawn', None)
+    datos_checkpoint = datos_nivel.get('checkpoint')
 
     vista = PygameView(
         frames_jugador        = frames_jugador,
@@ -154,9 +155,10 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         imagen_daga_pickup    = img_daga_pickup,
         datos_daga_pickup     = datos_daga_pickup,
         frames_daga_proyectil = frames_daga_proyectil,
-        datos_fin_nivel       =datos_fin_nivel,
-        datos_spawn           =datos_spawn,
-        datos_portal_regreso  =datos_portal_regreso,
+        datos_fin_nivel       = datos_fin_nivel,
+        datos_spawn           = datos_spawn,
+        datos_checkpoint      = datos_checkpoint,
+        datos_portal_regreso  = datos_portal_regreso,
     )
 
     presenter = JuegoPresenter(
@@ -165,7 +167,6 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         audio=audio,
         num_nivel=num_nivel,
     )
-
     # Arrancar música del nivel (si no hay ya música sonando)
     musica = datos_nivel.get('musica', 'Assets/Audio/Music/Ambient_Lingering_Action.wav')
     if audio and not pygame.mixer.music.get_busy():
@@ -237,10 +238,8 @@ def main():
                     estado_jugador_previo['pos_retroceso'] = list(
                         presenter.vista.sprite_jugador.shape.center)
                     estado_jugador_previo['corazones_recogidos'] = presenter.vista.indices_corazones_recogidos()
-                    estado_jugador_previo['daga_recogida'] = (
-                            presenter.vista.sprite_daga_pickup is None
-                            or presenter.vista.sprite_daga_pickup.recogida
-                    )
+                    estado_jugador_previo['daga_recogida'] = estado_jugador_previo['daga_desbloqueada']
+
                     pygame.mixer.music.stop()
                 elif presenter.nivel_anterior and num_nivel > 1:
                     pos_retroceso_guardada = estado_jugador_previo.get(

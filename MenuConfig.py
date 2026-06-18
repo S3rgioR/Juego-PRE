@@ -42,7 +42,7 @@ class MenuConfig:
     """
 
     PANEL_ANCHO = 460
-    PANEL_ALTO  = 480
+    PANEL_ALTO  = 540
     BTN_ANCHO   = 160
     BTN_ALTO    = 40
     BTN_RADIO   = 7
@@ -61,14 +61,15 @@ class MenuConfig:
     # Controles del juego para mostrar en la subpantalla
     CONTROLES = [
         ('A / D',        'Mover izquierda / derecha'),
+        ('W / S',        'Mover arriba / abajo'),
         ('Espacio',      'Saltar'),
         ('J',            'Atacar'),
         ('L',            'Lanzar daga'),
         ('E',            'Usar portal'),
-        ('F',            'Curar (ángel)'),
+        ('K',            'Interactuar'),
         ('F5',           'Guardar partida'),
         ('F9',           'Cargar partida'),
-        ('Esc / P',      'Pausa'),
+        ('Esc',          'Pausa'),
     ]
 
     def __init__(self, screen: pygame.Surface, audio):
@@ -143,7 +144,7 @@ class MenuConfig:
         # Botón Volver — en pantalla
         btn = pygame.Rect(0, 0, self.BTN_ANCHO, self.BTN_ALTO)
         btn.centerx = cx
-        btn.bottom  = self._panel_rect.bottom - 14
+        btn.bottom  = self._panel_rect.bottom - 22
         self._btn_volver_rect = btn
 
     # ── Helpers locales ──────────────────────────────────────────────────────
@@ -194,7 +195,7 @@ class MenuConfig:
 
         # Pista inferior
         if self.subpantalla == 'audio':
-            pista_txt = "W S · ← →  ajustar   ·   Esc volver"
+            pista_txt = "W S ·   Esc volver"
         else:
             pista_txt = "Esc para volver"
         pista = self._fuente_sub.render(pista_txt, True, (90, 85, 110))

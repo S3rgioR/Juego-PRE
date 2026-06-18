@@ -78,6 +78,7 @@ class PygameView:
                  imagen_corazon=None, datos_corazones=None,
                  imagen_daga_pickup=None, datos_daga_pickup=None,
                  datos_spawn=None,
+                 datos_checkpoint=None,
                  frames_daga_proyectil=None,
                  datos_fin_nivel=None,
                  datos_portal_regreso=None):
@@ -98,6 +99,9 @@ class PygameView:
         self.reloj  = pygame.time.Clock()
         self.camara = Camara()
 
+        # --- Checkpoint ---
+        cx, cy = datos_checkpoint if datos_checkpoint else CHECKPOINT_NIVEL_1
+        self.sprite_checkpoint = CheckpointView(cx, cy)
         # --- Fondos ---
         fondo_raw = pygame.image.load(
             "Assets/Enviorments/caverns-files-web/layers/background.png"
@@ -252,8 +256,7 @@ class PygameView:
                 datos_fin_nivel['alto'],
             )
 
-        # --- Checkpoint ---
-        self.sprite_checkpoint = CheckpointView(*CHECKPOINT_NIVEL_1)
+
 
         # --- Efecto de sangre (muerte de enemigos) ---
         self._frames_blood = self._cargar_frames_blood()

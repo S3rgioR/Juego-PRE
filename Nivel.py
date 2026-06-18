@@ -9,11 +9,71 @@ from TileCoords   import tp, tp_abs, tiles_to_px
 # NIVEL 1
 # ===========================================================================
 
-CHECKPOINT_NIVEL_1 = tp_abs(5, 2)
+CHECKPOINT_NIVEL_1 = tp_abs(32, 34)
 
 DATOS_NIVEL_1 = {
-    'spawn':      tp_abs(1, 0),          # ← posición de aparición del jugador
+    'spawn':      tp_abs(2, 20),          # ← posición de aparición del jugador
     'checkpoint': CHECKPOINT_NIVEL_1,
+    'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
+
+    'enemigos': [
+        {
+            'tipo':               'terrestre',
+            **tp(65, 7),
+            'distancia_patrulla': tiles_to_px(10),
+            'num_frames_ataque':  6,
+        },
+        {
+            'tipo':               'terrestre',
+            **tp(20, 28),
+            'distancia_patrulla': tiles_to_px(20),
+            'num_frames_ataque':  6,
+        },
+        {
+            'tipo': 'terrestre',
+            **tp(70, 40),
+            'distancia_patrulla': tiles_to_px(166),
+            'num_frames_ataque': 6,
+        },
+        {
+            'tipo':               'volador',
+            **tp(70, 28),
+            'distancia_patrulla': tiles_to_px(10),
+        },
+        {
+            'tipo': 'volador',
+            **tp(55, 43),
+            'distancia_patrulla': tiles_to_px(5),
+        },
+    ],
+
+    'boss': None,
+
+    'angel':      tp(37, 36),
+
+    'corazones': [tp(32, 42)],
+    'daga_pickup': None,
+
+    'fin_nivel': {
+        **tp(110, 43),
+        'ancho': 5,
+        'alto':  5,
+    },
+}
+
+
+def cargar_nivel_1(tileset: pygame.Surface) -> list:
+    return LevelParser(tileset).cargar('levels/nivel1.txt')
+
+
+# ===========================================================================
+# NIVEL 2
+# ===========================================================================
+CHECKPOINT_NIVEL_2 = tp_abs(5, 1)   # pon aquí las coordenadas que quieras
+
+DATOS_NIVEL_2 = {
+    'spawn':      tp_abs(1, 0),          # posición de aparición del jugador
+    'checkpoint': CHECKPOINT_NIVEL_2,
     'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
 
     'enemigos': [
@@ -56,60 +116,16 @@ DATOS_NIVEL_1 = {
     'boss': None,
 
     'angel':      tp(5, 30),
+    'portal_regreso': {
+        **tp(2, 2),      # al inicio del nivel, junto al ángel
+        'ancho': 5,
+        'alto':  5,
+    },
     'corazones': [tp(145, 38), tp(140, 21)],
     'daga_pickup': tp(10, 28),
 
     'fin_nivel': {
         **tp(150, 21),
-        'ancho': 5,
-        'alto':  5,
-    },
-}
-
-
-def cargar_nivel_1(tileset: pygame.Surface) -> list:
-    return LevelParser(tileset).cargar('levels/nivel1.txt')
-
-
-# ===========================================================================
-# NIVEL 2
-# ===========================================================================
-
-DATOS_NIVEL_2 = {
-    'spawn':      tp_abs(1, 0),          # ← posición de aparición del jugador
-    'checkpoint': tp_abs(3, 2),
-    'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
-
-    'enemigos': [
-        {
-            'tipo':               'terrestre',
-            **tp(9, 15),
-            'distancia_patrulla': tiles_to_px(5),
-            'num_frames_ataque':  6,
-        },
-        {
-            'tipo':               'volador',
-            **tp(25, 25),
-            'distancia_patrulla': tiles_to_px(6),
-        },
-    ],
-
-    'boss': {
-        'tipo': 'boss',
-        **tp(101, 9),
-    },
-
-    'angel':       tp(4, 16),
-    'portal_regreso': {
-    **tp(2, 2),      # al inicio del nivel, junto al ángel
-    'ancho': 5,
-    'alto':  5,
-    },
-    'corazones':   [tp(15, 27)],
-    'daga_pickup': None,
-
-    'fin_nivel': {
-        **tp(660, 0),
         'ancho': 5,
         'alto':  5,
     },
