@@ -53,6 +53,8 @@ from .ExplosionEffect    import ExplosionEffect
 from .HitEffect          import HitEffect
 from .PortalView import PortalView
 from .ParedBossView import ParedBossView
+from .PortalFinalView    import PortalFinalView
+from .FinDeJuegoSequence import FinDeJuegoSequence
 
 class PygameView:
     """Gestiona física, entrada, cámara, sprites y renderizado del juego.
@@ -83,6 +85,7 @@ class PygameView:
                  frames_daga_proyectil=None,
                  datos_pared_boss=None,
                  datos_fin_nivel=None,
+                 datos_portal_final=None,
                  datos_portal_regreso=None):
         """
         Parámetros nuevos
@@ -143,6 +146,7 @@ class PygameView:
 
         # Cargar frames del portal
         self._frames_portal = []
+
         for i in range(1, 65):
             img = pygame.image.load(f"Assets/Efectos/Portal/portal_9/portal{i}.png").convert_alpha()
             w, h = img.get_width(), img.get_height()
@@ -150,7 +154,28 @@ class PygameView:
             img = pygame.transform.scale(img, (int(w * escala), int(h * escala)))
             self._frames_portal.append(img)
 
+        # --- Portal final de juego (7 frames propios) ---
+        self._frames_portal_final = []
+        ESCALA_PORTAL_FINAL = Constantes.SCALA_PERSONAJE * 0.5  # ← sube/baja este número para cambiar el tamaño
+        for i in range(1, 8):
+            img = pygame.image.load(
+                f"Assets/Efectos/Portal Final juego/Frames/portal1_frame_{i}.png"
+            ).convert_alpha()
+            w, h = img.get_width(), img.get_height()
+            img = pygame.transform.scale(
+                img, (int(w * ESCALA_PORTAL_FINAL), int(h * ESCALA_PORTAL_FINAL)))
+            self._frames_portal_final.append(img)
 
+        self.portal_final = None
+        self._seq_fin_juego = None
+        self._ultimo_delta_ms = 0
+        if datos_portal_final:
+            self.portal_final = PortalFinalView(
+                datos_portal_final['x'], datos_portal_final['y'],
+                self._frames_portal_final,
+                datos_portal_final.get('ancho', 1),
+                datos_portal_final.get('alto', 1),
+            )
         # Portal de avance (fin de nivel) — siempre presente si datos_fin_nivel existe
         self.portal_fin = None
         if datos_fin_nivel:
@@ -160,6 +185,7 @@ class PygameView:
                 datos_fin_nivel.get('ancho', 1),
                 datos_fin_nivel.get('alto', 1),
             )
+
 
         # Portal de regreso (solo desde nivel 2 en adelante)
         self.portal_regreso = None
@@ -368,6 +394,9 @@ class PygameView:
                     # NO llamar aquí para evitar doble disparo si el salto falla.
                 elif event.key == pygame.K_e:
                     self.evt_tecla_e.emit()
+                    if (self.portal_final and self._seq_fin_juego is None
+                            and self.portal_final.esta_cerca(self.sprite_jugador.shape)):
+                        self.iniciar_fin_de_juego()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -404,6 +433,7 @@ class PygameView:
         self._detectar_combate(modelo)
         self._detectar_corazones(modelo)
         self._detectar_daga_pickup(modelo)     # ← recoger objeto daga
+        self._ultimo_delta_ms = delta_time_ms  # ← lo usa la secuencia de fin de juego
 
         hitbox_espada = (self._calcular_hitbox_ataque_jugador(
             self.sprite_jugador.shape, modelo.jugador.flip)
@@ -481,6 +511,12 @@ class PygameView:
         if self.portal_regreso:
             cerca = self.portal_regreso.esta_cerca(self.sprite_jugador.shape)
             self.portal_regreso.set_mostrar_prompt(cerca, "[E] Nivel anterior")
+
+        # Portal final
+        if self.portal_final:
+            cerca = self.portal_final.esta_cerca(self.sprite_jugador.shape)
+            self.portal_final.set_mostrar_prompt(cerca, "[E] Fin del juego")
+            self.portal_final.actualizar(delta_time_ms)
     # --- Mover proyectiles de daga del jugador ---
 
     def _mover_dagas_jugador(self, modelo):
@@ -539,6 +575,29 @@ class PygameView:
             if corazon.colisiona_con(shape):
                 corazon.recoger()
                 self.evt_corazon_recogido.emit(corazon.indice)
+
+    @property
+    def fin_juego_activado(self) -> bool:
+        return self._seq_fin_juego is not None
+
+    @property
+    def fin_de_juego_terminado(self) -> bool:
+        """True cuando la secuencia de fin de juego ya mostró los textos
+        y terminó de esperar: el Presenter debe usar esto para volver
+        al menú principal."""
+        return self._seq_fin_juego is not None and self._seq_fin_juego.terminado
+
+    def iniciar_fin_de_juego(self):
+        """Arranca la secuencia de fin de juego (fade a negro + textos).
+
+        La llama internamente esta misma clase cuando el jugador pulsa [E]
+        estando cerca del portal_final. A partir de aquí renderizar()
+        deja de dibujar el juego y solo muestra la secuencia.
+        """
+        if self._seq_fin_juego is None:
+            self._seq_fin_juego = FinDeJuegoSequence(self.screen)
+            if self.portal_final:
+                self.portal_final.set_mostrar_prompt(False)
 
     # --- Movimiento del jugador ---
 
@@ -865,6 +924,19 @@ class PygameView:
             self.portal_fin.draw(self.screen, self.camara)
         if self.portal_regreso:
             self.portal_regreso.draw(self.screen, self.camara)
+
+        if self.portal_final:
+            self.portal_final.draw(self.screen, self.camara)
+
+        # Secuencia de fin de juego: toma el control total de la pantalla
+        # (fade a negro + textos). Mientras esté activa no se dibuja nada
+        # más encima (ni jugador, ni HUD), si no se verían flotando sobre
+        # el fundido a negro.
+        if self._seq_fin_juego:
+            self._seq_fin_juego.actualizar(self._ultimo_delta_ms)
+            self._seq_fin_juego.draw()
+            pygame.display.flip()
+            return
 
         # Jugador (encima de todo)
         self.sprite_jugador.draw(self.screen, self.camara)

@@ -103,7 +103,7 @@ class BossModel(Actor):
     # Embestida
     VEL_BAJAR      = 5
     VEL_EMBESTIDA  = 11
-    OVERSHOOT_PX   = 330
+    OVERSHOOT_PX   = 230
     VEL_SUBIR      = 3
     PAUSA_PASAR_MS = 350   # tiempo inmóvil tras pasarse
 

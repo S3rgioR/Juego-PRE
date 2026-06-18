@@ -82,6 +82,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
             f'levels/nivel{num_nivel}.txt'
         )
     datos_portal_regreso = datos_nivel.get('portal_regreso', None)
+    datos_portal_final   = datos_nivel.get('portal_final', None)
     s = Constantes.SCALA_PERSONAJE
 
     # --- Dimensiones del personaje (antes de set_mode) ---
@@ -171,6 +172,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         datos_checkpoint      = datos_checkpoint,
         datos_pared_boss      = datos_pared_boss,
         datos_portal_regreso  = datos_portal_regreso,
+        datos_portal_final    = datos_portal_final,
 
     )
 
@@ -198,7 +200,9 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         if estado_jugador_previo.get('viene_de_retroceso') and 'pos_retroceso' in estado_jugador_previo:
             x, y = estado_jugador_previo['pos_retroceso']
             vista.restaurar_pos_jugador(int(x), int(y))
+
     presenter.ejecutar()
+
     return presenter
 
 
@@ -275,6 +279,8 @@ def main():
                     break # volvió al menú sin completar
                 pygame.mixer.music.stop()
 
+                if presenter.juego_finalizado:
+                    break  # sale del while de niveles → vuelve al menú principal
         elif accion == 'cargar':
             pygame.mixer.music.stop()
             # Leer el nivel del save antes de arrancar

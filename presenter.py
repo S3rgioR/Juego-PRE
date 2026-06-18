@@ -93,6 +93,10 @@ class JuegoPresenter:
 
         self.vista.evt_nivel_completado.add_listener(self._nivel_completado)
 
+        self.juego_finalizado = False
+        self._seq_activa = False
+        self.vista.evt_tecla_e.add_listener(self._usar_portal)
+
     # --- Handlers de eventos ---
     def _nivel_completado(self):
         self.nivel_completado = True
@@ -150,11 +154,18 @@ class JuegoPresenter:
 
     def _usar_portal(self):
         shape = self.vista.sprite_jugador.shape
-
         if self.vista.portal_fin and self.vista.portal_fin.esta_cerca(shape):
             self._nivel_completado()
         elif self.vista.portal_regreso and self.vista.portal_regreso.esta_cerca(shape):
             self._nivel_anterior()
+        elif self.vista.portal_final and self.vista.portal_final.esta_cerca(shape):
+            self._activar_fin_juego()
+
+    def _activar_fin_juego(self):
+        from view.FinDeJuegoSequence import FinDeJuegoSequence
+        self.vista._seq_fin_juego = FinDeJuegoSequence(self.vista.screen)
+        self._seq_activa = True
+
     def _saltar(self):  self.modelo.jugador_saltar()
     def _atacar(self):  self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
 
@@ -330,3 +341,12 @@ class JuegoPresenter:
             estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
             self.vista.renderizar(estado_jugador, estados_enemigos, self.modelo)
 
+            # Secuencia de fin de juego
+            if self._seq_activa and self.vista._seq_fin_juego:
+                delta_time = getattr(self, '_last_delta', 16)
+                self.vista._seq_fin_juego.actualizar(delta_time)
+                self.vista._seq_fin_juego.draw()
+                pygame.display.flip()
+                if self.vista._seq_fin_juego.terminado:
+                    self.juego_finalizado = True
+                    self.ejecutando = False
