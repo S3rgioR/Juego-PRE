@@ -10,8 +10,7 @@ from Nivel         import NIVELES
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
 from view.AudioManager import AudioManager
-from view.PortalView import PortalView
-
+from LevelParser import LevelParser
 def escalar_img(image, scale):
     w, h = image.get_width(), image.get_height()
     return pygame.transform.scale(image, (int(w * scale), int(h * scale)))
@@ -70,6 +69,18 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         num_nivel = 1
 
     nivel_loader, datos_nivel = NIVELES[num_nivel]
+    # --- Pared del boss (opcional, solo en niveles con boss) ---
+    from LevelParser import LevelParser as _LP
+    _lp_tmp = _LP.__new__(_LP)  # instancia sin tileset para solo leer el txt
+    datos_pared_boss = None
+    if datos_nivel.get('boss'):
+        # El tileset no importa aquí, solo leemos metadatos
+        tileset_tmp = pygame.image.load(
+            "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png"
+        ).convert_alpha()
+        datos_pared_boss = LevelParser(tileset_tmp).cargar_pared_boss(
+            f'levels/nivel{num_nivel}.txt'
+        )
     datos_portal_regreso = datos_nivel.get('portal_regreso', None)
     s = Constantes.SCALA_PERSONAJE
 
@@ -158,7 +169,9 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         datos_fin_nivel       = datos_fin_nivel,
         datos_spawn           = datos_spawn,
         datos_checkpoint      = datos_checkpoint,
+        datos_pared_boss      = datos_pared_boss,
         datos_portal_regreso  = datos_portal_regreso,
+
     )
 
     presenter = JuegoPresenter(

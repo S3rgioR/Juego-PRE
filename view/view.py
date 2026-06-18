@@ -52,6 +52,7 @@ from .BloodEffect        import BloodEffect
 from .ExplosionEffect    import ExplosionEffect
 from .HitEffect          import HitEffect
 from .PortalView import PortalView
+from .ParedBossView import ParedBossView
 
 class PygameView:
     """Gestiona física, entrada, cámara, sprites y renderizado del juego.
@@ -80,6 +81,7 @@ class PygameView:
                  datos_spawn=None,
                  datos_checkpoint=None,
                  frames_daga_proyectil=None,
+                 datos_pared_boss=None,
                  datos_fin_nivel=None,
                  datos_portal_regreso=None):
         """
@@ -186,6 +188,15 @@ class PygameView:
                 datos_boss['anim_fase1'], datos_boss['anim_fase2'])
             self.sprite_boss.proyectil_frames = frames_proyectil
 
+        # --- Pared del boss ---
+        self.pared_boss = None
+        if datos_pared_boss:
+            self.pared_boss = ParedBossView(
+                datos_pared_boss['x'],
+                datos_pared_boss['y'],
+                datos_pared_boss['ancho'],
+                datos_pared_boss['alto'],
+            )
         self.sprites_enemigos = []
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
@@ -246,6 +257,7 @@ class PygameView:
         self.audio = audio
 
         self.evt_nivel_completado = Event()
+
 
         # Rect del trigger (None si el nivel no tiene salida)
         self._trigger_fin_nivel = None
@@ -425,6 +437,10 @@ class PygameView:
                     if p.shape.colliderect(plat.shape):
                         p.vivo = False
                         break
+                plats_solidas = self.sprites_plataformas_solidas[:]
+                if self.pared_boss and self.pared_boss.activa:
+                    plats_solidas.append(self.pared_boss)
+
                 # Bloqueado por espada del jugador
                 if p.vivo and hitbox_espada and hitbox_espada.colliderect(p.shape):
                     p.vivo = False
@@ -449,6 +465,8 @@ class PygameView:
             # Detectar muerte del boss en este frame
             if not modelo.boss.vivo and not self._boss_muerte_disparada:
                 self._disparar_efectos_muerte_boss()
+                if self.pared_boss:  # ← añadir
+                    self.pared_boss.activa = False
 
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
 
@@ -533,10 +551,15 @@ class PygameView:
         if jugador_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
             jugador_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
+        plats_activas = self.sprites_plataformas[:]
+        if self.pared_boss and self.pared_boss.activa:
+            plats_activas.append(self.pared_boss)
+
         # --- Movimiento horizontal ---
         delta_x = modelo.delta_x_jugador
         shape.x += delta_x
-        for plat in self.sprites_plataformas:
+
+        for plat in plats_activas:
             if plat.unidireccional:
                 continue  # las plataformas flotantes no bloquean lateralmente
             if shape.colliderect(plat.shape):
@@ -556,7 +579,7 @@ class PygameView:
         shape.y        = int(jugador_m._y) + 1
 
         tocando_suelo = False
-        for plat in self.sprites_plataformas:
+        for plat in  plats_activas:
             if not shape.colliderect(plat.shape):
                 continue
 
@@ -777,6 +800,8 @@ class PygameView:
         for plat in self.sprites_plataformas:
             plat.draw(self.screen, self.camara)
 
+        if self.pared_boss and self.pared_boss.activa:
+            self.pared_boss.draw(self.screen, self.camara)
         # Checkpoint
         cerca_cp = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
         self.sprite_checkpoint.set_mostrar_prompt(cerca_cp)

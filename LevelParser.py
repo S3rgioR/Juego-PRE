@@ -159,6 +159,10 @@ class LevelParser:
 
         sin_comentarios = ' '.join(linea.split('#')[0] for linea in lineas)
 
+        # Eliminar secciones con prefijo conocido (P.Boss:, etc.)
+        # para que no se confundan con plataformas flotantes
+        sin_comentarios = re.sub(r'P\.Boss\s*:\s*\[[^\]]*\]', '', sin_comentarios)
+
         secciones = []
         for bloque in re.findall(r'\[([^\]]*)\]', sin_comentarios):
             numeros = [int(t) for t in bloque.split() if t]
@@ -344,6 +348,31 @@ class LevelParser:
             if abs(c - resultado[-1]) > tolerancia:
                 resultado.append(c)
         return resultado
+
+    def cargar_pared_boss(self, ruta: str):
+        import os, re
+        import Constantes
+        ruta_abs = os.path.join(os.path.dirname(os.path.abspath(__file__)), ruta)
+        with open(ruta_abs, 'r', encoding='utf-8') as f:
+            contenido = f.read()
+
+        m = re.search(r'P\.Boss\s*:\s*\[([^\]]*)\]', contenido)
+        if not m:
+            return None
+
+        nums = [int(t) for t in m.group(1).split() if t]
+        if len(nums) != 2:
+            raise ValueError(
+                f"[LevelParser] P.Boss en '{ruta}' necesita exactamente 2 números: "
+                f"[tx  ty], se encontraron {len(nums)}: {nums}"
+            )
+        tx, ty = nums
+        tile = max(1, Constantes.WIDTH_PERSONAJE)
+        ancho = tile  # 1 tile de ancho
+        alto = tile * 5  # 6 tiles de alto
+        x = tx * tile
+        y = Constantes.SUELO_Y - ty * tile - alto  # borde superior de la pared
+        return {'x': x, 'y': y, 'ancho': ancho, 'alto': alto}
 
     def _rangos_exterior(self, cortes, y_min, y_max):
         rangos = []
