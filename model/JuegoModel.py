@@ -170,6 +170,42 @@ class JuegoModel:
 
         }
 
+    def restaurar_enemigos(self, datos_enemigos, datos_boss):
+        """Recrea los modelos de enemigos y boss a partir de los datos originales del nivel.
+
+        Se llama al cargar partida para que los enemigos que hubieran muerto
+        vuelvan a aparecer en su posición inicial, y se limpien sus proyectiles.
+
+        Parameters
+        ----------
+        datos_enemigos : list of dict
+            Lista de dicts de enemigos del nivel (misma estructura que en __init__).
+        datos_boss : dict or None
+            Datos del boss del nivel, o None si no hay boss.
+        """
+        self.enemigos = []
+        for d in datos_enemigos:
+            if d.get('tipo') == 'volador':
+                self.enemigos.append(
+                    Enemigo2Model(
+                        d['x'], d['y'],
+                        distancia_patrulla=d.get('distancia_patrulla', 150),
+                    )
+                )
+            else:
+                self.enemigos.append(
+                    Enemigo1Model(
+                        d['x'], d['y'],
+                        distancia_patrulla=d.get('distancia_patrulla', 150),
+                        num_frames_ataque=d.get('num_frames_ataque', 6),
+                    )
+                )
+
+        if datos_boss:
+            self.boss = BossModel(datos_boss['x'], datos_boss['y'])
+        else:
+            self.boss = None
+
     def cargar_estado_guardado(self, datos):
         if 'hp_max' in datos:
             self.jugador.hp_max = max(JugadorModel.HP_MAX_BASE, int(datos['hp_max']))

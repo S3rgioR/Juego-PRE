@@ -36,7 +36,8 @@ class JuegoPresenter:
         Número de frames de la animación de ataque del jugador.
     """
 
-    def __init__(self, vista, modelo, num_frames_ataque_jugador=4, audio=None, num_nivel=1):
+    def __init__(self, vista, modelo, num_frames_ataque_jugador=4, audio=None, num_nivel=1,
+                 datos_enemigos=None, datos_boss=None):
 
         self.vista      = vista
         self.audio = audio
@@ -58,6 +59,9 @@ class JuegoPresenter:
         self._menu_pausa  = None   # se crea al pausar (así tiene el save actualizado)
         self.salida_forzada   = False  # True si el usuario cerró la ventana con la X
         self.nivel_a_cargar   = None   # int si hay que relanzar en otro nivel
+        # Datos originales del nivel: necesarios para restaurar enemigos al cargar
+        self._datos_enemigos_nivel = datos_enemigos or []
+        self._datos_boss_nivel     = datos_boss
 
         # --- Suscripción a eventos de la Vista ---
         self.vista.evt_cerrar.add_listener(self._cerrar)
@@ -297,6 +301,17 @@ class JuegoPresenter:
             # Se guarda en _estado_jugador_previo para que _nivel_anterior()
             # lo propague correctamente si el jugador usa el portal de regreso.
             self._estado_jugador_previo = datos.get('estado_niveles_anteriores', None)
+
+            # Restaurar enemigos: los que habían muerto vuelven a su posición
+            # inicial y se limpian todos los proyectiles en pantalla.
+            self.modelo.restaurar_enemigos(
+                self._datos_enemigos_nivel, self._datos_boss_nivel)
+            self.vista.restaurar_enemigos(
+                self._datos_enemigos_nivel, self._datos_boss_nivel)
+            # Limpiar también los proyectiles de los modelos de enemigos voladores
+            # (el modelo los recrea vacíos, pero los del boss se limpian explícitamente)
+            if self.modelo.boss:
+                self.modelo.boss.proyectiles = []
 
             self.vista.sprite_checkpoint.activar()
             # Activar pantalla de carga: congela el loop visible hasta que

@@ -181,6 +181,8 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         num_frames_ataque_jugador=len(frames_jugador['AtaqueParado']),
         audio=audio,
         num_nivel=num_nivel,
+        datos_enemigos=datos_enemigos,
+        datos_boss=datos_boss,
     )
     # Dar al presenter acceso al estado acumulado de niveles anteriores
     # para que el checkpoint y el portal de regreso lo preserven.

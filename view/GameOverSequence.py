@@ -9,7 +9,7 @@ Fases
 
 import pygame
 import Constantes
-
+import Fuentes
 
 class GameOverSequence:
     """Gestiona la transición visual tras la muerte del jugador.
@@ -48,7 +48,7 @@ class GameOverSequence:
         )
 
         # Fuente para el texto
-        self._fuente = pygame.font.SysFont(None, 140)
+        self._fuente = Fuentes.obtener_fuente(96)
 
     # ------------------------------------------------------------------
 

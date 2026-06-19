@@ -160,6 +160,8 @@ class PygameView:
             frames_proyectil.append(pygame.transform.scale(
                 img, (int(img.get_width() * escala_proj),
                       int(img.get_height() * escala_proj))))
+        # Guardar referencia para reutilizarlos en restaurar_enemigos()
+        self._frames_proyectil_cache = frames_proyectil
 
         # Cargar frames del portal
         self._frames_portal = []
@@ -1048,6 +1050,43 @@ class PygameView:
                                 self._frames_blood))
             self.sprites_enemigos.pop(indice)
 
+    def restaurar_enemigos(self, datos_enemigos, datos_boss):
+        """Recrea los sprites de enemigos y limpia todos los proyectiles.
+
+        Se llama al cargar partida para que los enemigos que hubieran muerto
+        reaparezcan en su posición inicial y la pantalla quede limpia de
+        proyectiles enemigos (tanto de voladores como del boss).
+
+        Parameters
+        ----------
+        datos_enemigos : list of dict
+            Lista de dicts de enemigos del nivel (misma estructura que en __init__).
+        datos_boss : dict or None
+            Datos del boss del nivel, o None si no hay boss.
+        """
+        from .Enemigo_1 import Enemigo1Sprite
+        from .Enemigo_2 import Enemigo2Sprite
+
+        self.sprites_enemigos = []
+        for d in datos_enemigos:
+            if d.get('tipo') == 'volador':
+                sprite = Enemigo2Sprite(d['x'], d['y'], d['anim_walk'])
+                sprite.proyectil_frames = getattr(self, '_frames_proyectil_cache', [])
+                self.sprites_enemigos.append(sprite)
+            else:
+                self.sprites_enemigos.append(
+                    Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
+
+        # Limpiar proyectiles del boss si existe
+        if self.sprite_boss and datos_boss:
+            self.sprite_boss.shape.center = (datos_boss['x'], datos_boss['y'])
+
+        # Limpiar efectos visuales residuales
+        self._efectos_sangre    = []
+        self._efectos_explosion = []
+        self._efectos_hit       = []
+        self._sprites_dagas     = []
+
     # ------------------------------------------------------------------
     # Efectos visuales: sangre y explosión
     # ------------------------------------------------------------------
@@ -1358,7 +1397,7 @@ class PygameView:
         No llama a pygame.display.flip() — lo gestiona el presenter.
         """
         self.screen.fill((0, 0, 0))
-        fuente = pygame.font.SysFont(None, 72)
+        fuente =  Fuentes.obtener_fuente(58)
         texto  = fuente.render("Cargando...", True, (255, 255, 255))
         x = (Constantes.WIDTH  - texto.get_width())  // 2
         y = (Constantes.HEIGHT - texto.get_height()) // 2
