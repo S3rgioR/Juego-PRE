@@ -102,7 +102,9 @@ class Enemigo1Model(Actor):
             if self.persiguiendo:
                 # En modo alerta siempre sabe dónde está el jugador: actualizar flip
                 self.flip = dx < 0
-                delta_x   = -self.velocidad_persecucion if self.flip else self.velocidad_persecucion
+                # Solo avanzar si aún no ha llegado a la distancia de seguridad
+                if dist > self.rango_ataque:
+                    delta_x = -self.velocidad_persecucion if self.flip else self.velocidad_persecucion
             else:
                 delta_x = self._calcular_patrulla(ex)
         else:
@@ -153,8 +155,12 @@ class Enemigo1Model(Actor):
         ancho_hit  = Constantes.WIDTH_PERSONAJE * 4
         alto_hit   = int(Constantes.HEIGHT_PERSONAJE * 1.5)
         mitad_body = int(Constantes.WIDTH_PERSONAJE)
-        x = (ex - mitad_body - ancho_hit) if self.flip else (ex + mitad_body)
-        return pygame.Rect(x, ey - alto_hit // 2, ancho_hit, alto_hit)
+        # La hitbox cubre el arma (hacia delante) Y el propio cuerpo (hacia atrás),
+        # para que el jugador no pueda golpear al enemigo "gratis" desde dentro
+        # mientras el ataque está activo.
+        ancho_total = ancho_hit + mitad_body * 2   # arma + cuerpo completo
+        x = (ex - mitad_body - ancho_hit) if self.flip else (ex - mitad_body)
+        return pygame.Rect(x, ey - alto_hit // 2, ancho_total, alto_hit)
 
     def obtener_estado(self, pos):
         return {

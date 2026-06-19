@@ -90,6 +90,9 @@ class JuegoPresenter:
         self.nivel_completado = False
         self.nivel_anterior = False
         self.estado_jugador_al_retroceder = None
+        # Estado acumulado recibido de main.py al entrar al nivel
+        # (se usa para guardar en checkpoint y propagar al retroceder).
+        self._estado_jugador_previo = None
 
         self.vista.evt_nivel_completado.add_listener(self._nivel_completado)
 
@@ -110,11 +113,15 @@ class JuegoPresenter:
         self.estado_jugador_al_retroceder = self.modelo.obtener_estado_guardado()
         self.estado_jugador_al_retroceder['daga_desbloqueada'] = self.modelo.jugador.daga_desbloqueada
         self.estado_jugador_al_retroceder['corazones_recogidos'] = self.vista.indices_corazones_recogidos()
-        self.estado_jugador_al_retroceder['daga_recogida'] = (
-                self.vista.sprite_daga_pickup is None
-                or self.vista.sprite_daga_pickup.recogida
+        self.estado_jugador_al_retroceder['daga_recogida'] = bool(
+                self.vista.sprite_daga_pickup is not None
+                and self.vista.sprite_daga_pickup.recogida
         )
-        self.estado_jugador_al_retroceder['pos'] = list(self.vista.sprite_jugador.shape.center)  # ← NUEVO
+        self.estado_jugador_al_retroceder['pos'] = list(self.vista.sprite_jugador.shape.center)
+        # Propagar el estado de niveles anteriores tal como llegó:
+        # main.py lo usará para reconstruir la cadena completa al retroceder.
+        if self._estado_jugador_previo is not None:
+            self.estado_jugador_al_retroceder['estado_niveles_anteriores'] = self._estado_jugador_previo
         self.nivel_anterior = True
         self.ejecutando = False
 
@@ -197,7 +204,9 @@ class JuegoPresenter:
         return bool(self.vista._frames_daga_proyectil)
 
     def _guardar_partida(self):
-        """Guarda posición (de la Vista), hp (del Model) y cámara."""
+        """Guarda posición (de la Vista), hp (del Model), cámara y el estado
+        acumulado de los niveles anteriores (para que el portal de regreso
+        funcione correctamente tras una carga)."""
         try:
             estado = self.modelo.obtener_estado_guardado()
             estado['pos']                 = list(self.vista.sprite_jugador.shape.center)
@@ -209,11 +218,19 @@ class JuegoPresenter:
             estado['boss_derrotado'] = (
                 self.modelo.boss is None or not self.modelo.boss.vivo
             )
-            # Guardar si la daga pickup ya fue recogida
-            estado['daga_recogida'] = (
-                self.vista.sprite_daga_pickup is None
-                or self.vista.sprite_daga_pickup.recogida
+            # Guardar si la daga pickup ya fue recogida.
+            # Si el nivel no tiene daga (sprite_daga_pickup is None) se guarda
+            # False: la ausencia del objeto no equivale a haberlo recogido.
+            # Solo se guarda True si el sprite existe Y está marcado como recogido.
+            estado['daga_recogida'] = bool(
+                self.vista.sprite_daga_pickup is not None
+                and self.vista.sprite_daga_pickup.recogida
             )
+            # Snapshot del estado acumulado de niveles anteriores.
+            # Esto permite que al cargar y usar el portal de regreso,
+            # los objetos ya recogidos en niveles previos sigan recogidos.
+            if self._estado_jugador_previo is not None:
+                estado['estado_niveles_anteriores'] = self._estado_jugador_previo
             if self.save_manager.guardar(estado):
                 print("[Presenter] ✓ Partida guardada")
                 self.vista.sprite_checkpoint.activar()
@@ -264,6 +281,11 @@ class JuegoPresenter:
             # Restaurar boss: si estaba derrotado al guardar, matarlo en el modelo
             if datos.get('boss_derrotado') and self.modelo.boss:
                 self.modelo.boss.vivo = False
+
+            # Restaurar el estado acumulado de niveles anteriores.
+            # Se guarda en _estado_jugador_previo para que _nivel_anterior()
+            # lo propague correctamente si el jugador usa el portal de regreso.
+            self._estado_jugador_previo = datos.get('estado_niveles_anteriores', None)
 
             self.vista.sprite_checkpoint.activar()
             print("[Presenter] ✓ Partida cargada")

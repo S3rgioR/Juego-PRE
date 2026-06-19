@@ -182,6 +182,9 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         audio=audio,
         num_nivel=num_nivel,
     )
+    # Dar al presenter acceso al estado acumulado de niveles anteriores
+    # para que el checkpoint y el portal de regreso lo preserven.
+    presenter._estado_jugador_previo = estado_jugador_previo
     # Arrancar música del nivel (si no hay ya música sonando)
     musica = datos_nivel.get('musica', 'Assets/Audio/Music/Ambient_Lingering_Action.wav')
     if audio and not pygame.mixer.music.get_busy():
@@ -245,9 +248,13 @@ def main():
                                                 cargar_save=True)
                     if presenter.salida_forzada:
                         break
-                    # Continuar el while con el nivel actual del nuevo presenter
+                    # Actualizar num_nivel con el nivel en que terminó el presenter
+                    # y sincronizar estado_jugador_previo desde él, para que el
+                    # bucle procese correctamente nivel_completado / nivel_anterior
+                    # sin relanzar el nivel innecesariamente con continue.
                     num_nivel = presenter.num_nivel
-                    continue
+                    estado_jugador_previo = presenter._estado_jugador_previo
+                    # Caer al bloque if/elif de abajo para procesar el resultado
                 if presenter.nivel_completado:
                     num_nivel += 1
                     estado_jugador_previo = presenter.modelo.obtener_estado_guardado()
@@ -259,21 +266,36 @@ def main():
 
                     pygame.mixer.music.stop()
                 elif presenter.nivel_anterior and num_nivel > 1:
-                    pos_retroceso_guardada = estado_jugador_previo.get(
-                        'pos_retroceso') if estado_jugador_previo else None
-                    corazones_retroceso_guardados = estado_jugador_previo.get(
-                        'corazones_recogidos') if estado_jugador_previo else None
-
                     num_nivel -= 1
                     estado_jugador_previo = presenter.estado_jugador_al_retroceder
+
+                    # Si el presenter tiene un snapshot de niveles anteriores
+                    # (vía checkpoint cargado o retroceso previo), recuperarlo.
+                    # Tiene precedencia sobre el estado_jugador_previo del bucle,
+                    # que puede ser None o pertenecer a un nivel diferente.
+                    estado_desde_presenter = estado_jugador_previo.get(
+                        'estado_niveles_anteriores')
+                    if estado_desde_presenter is not None:
+                        # El portal de regreso ya lleva toda la cadena dentro:
+                        # sustituir estado_jugador_previo por el nivel correcto.
+                        estado_jugador_previo = estado_desde_presenter
+                    else:
+                        # Fallback: usar el estado acumulado del bucle (puede ser
+                        # None si es la primera vez que se retrocede sin save).
+                        pos_retroceso_guardada = (
+                            estado_jugador_previo.get('pos_retroceso')
+                            if estado_jugador_previo else None
+                        )
+                        corazones_retroceso_guardados = (
+                            estado_jugador_previo.get('corazones_recogidos')
+                            if estado_jugador_previo else None
+                        )
+                        if pos_retroceso_guardada:
+                            estado_jugador_previo['pos_retroceso'] = pos_retroceso_guardada
+                        if corazones_retroceso_guardados is not None:
+                            estado_jugador_previo['corazones_recogidos'] = corazones_retroceso_guardados
+
                     estado_jugador_previo['viene_de_retroceso'] = True
-
-                    if pos_retroceso_guardada:
-                        estado_jugador_previo['pos_retroceso'] = pos_retroceso_guardada
-                    if corazones_retroceso_guardados is not None:
-                        estado_jugador_previo[
-                            'corazones_recogidos'] = corazones_retroceso_guardados  # ← restaurar corazones del nivel anterior
-
                     pygame.mixer.music.stop()
                 else:
                     break # volvió al menú sin completar
@@ -283,11 +305,52 @@ def main():
                     break  # sale del while de niveles → vuelve al menú principal
         elif accion == 'cargar':
             pygame.mixer.music.stop()
-            # Leer el nivel del save antes de arrancar
             datos_save = save_manager.cargar()
-            num_nivel_save = datos_save.get('num_nivel', 1) if datos_save else 1
-            presenter = iniciar_partida(audio, num_nivel=num_nivel_save, cargar_save=True)
-            if presenter.salida_forzada: break
+            num_nivel = datos_save.get('num_nivel', 1) if datos_save else 1
+            estado_jugador_previo = None
+            # Arrancar en el nivel del save y dejar que el bucle de niveles
+            # procese nivel_completado / nivel_anterior normalmente.
+            presenter = iniciar_partida(audio, num_nivel=num_nivel, cargar_save=True)
+            if presenter.salida_forzada:
+                break
+            estado_jugador_previo = presenter._estado_jugador_previo
+            # Procesar el resultado igual que en el bucle jugar
+            while True:
+                if presenter.nivel_completado:
+                    num_nivel += 1
+                    estado_jugador_previo = presenter.modelo.obtener_estado_guardado()
+                    estado_jugador_previo['daga_desbloqueada'] = presenter.modelo.jugador.daga_desbloqueada
+                    estado_jugador_previo['pos_retroceso'] = list(
+                        presenter.vista.sprite_jugador.shape.center)
+                    estado_jugador_previo['corazones_recogidos'] = presenter.vista.indices_corazones_recogidos()
+                    estado_jugador_previo['daga_recogida'] = estado_jugador_previo['daga_desbloqueada']
+                    pygame.mixer.music.stop()
+                elif presenter.nivel_anterior and num_nivel > 1:
+                    num_nivel -= 1
+                    estado_jugador_previo = presenter.estado_jugador_al_retroceder
+                    estado_desde_presenter = estado_jugador_previo.get('estado_niveles_anteriores')
+                    if estado_desde_presenter is not None:
+                        estado_jugador_previo = estado_desde_presenter
+                    estado_jugador_previo['viene_de_retroceso'] = True
+                    pygame.mixer.music.stop()
+                else:
+                    break
+                if presenter.juego_finalizado:
+                    break
+                if num_nivel not in NIVELES:
+                    break
+                presenter = iniciar_partida(audio, num_nivel=num_nivel,
+                                            estado_jugador_previo=estado_jugador_previo)
+                if presenter.salida_forzada:
+                    break
+                if presenter.nivel_a_cargar:
+                    num_nivel = presenter.nivel_a_cargar
+                    pygame.mixer.music.stop()
+                    presenter = iniciar_partida(audio, num_nivel=num_nivel, cargar_save=True)
+                    if presenter.salida_forzada:
+                        break
+                    num_nivel = presenter.num_nivel
+                    estado_jugador_previo = presenter._estado_jugador_previo
 
     pygame.quit()
     sys.exit()
