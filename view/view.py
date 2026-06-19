@@ -353,6 +353,10 @@ class PygameView:
         """
         self.sprite_jugador.shape.center = (x, y)
         self.sprite_jugador._hitbox_ataque_cache = None
+        # Sincronizar el float interno _y con la nueva posición.
+        # Sin esto, la física parte del _y antiguo el frame siguiente
+        # y empuja al jugador de vuelta a donde estaba antes de cargar.
+        self.sprite_jugador._y_override = float(self.sprite_jugador.shape.y)
 
     def restaurar_corazones_recogidos(self, indices: set):
         for c in self.sprites_corazones:
@@ -655,6 +659,12 @@ class PygameView:
                                      # actuar como suelo (solo si veniamos de arriba)
 
         jugador_m._y  = getattr(jugador_m, '_y', float(shape.y))
+        # Si restaurar_pos_jugador fijó un override (carga de partida),
+        # usarlo y descartarlo para que la física parta de la posición correcta.
+        override = getattr(self.sprite_jugador, '_y_override', None)
+        if override is not None:
+            jugador_m._y = override
+            del self.sprite_jugador._y_override
         jugador_m._y += jugador_m.velocidad_y
         shape.y        = int(jugador_m._y) + 1
 
@@ -1151,3 +1161,18 @@ class PygameView:
             x = (Constantes.WIDTH  - texto_go.get_width())  // 2
             y = (Constantes.HEIGHT - texto_go.get_height()) // 2
             self.screen.blit(texto_go, (x, y))
+
+    def dibujar_pantalla_cargando(self):
+        """Pinta un overlay negro con 'Cargando...' centrado en pantalla.
+
+        Se llama cada frame durante el estado de carga post-restauración,
+        mientras la física resuelve la posición del jugador en silencio.
+        No llama a pygame.display.flip() — lo gestiona el presenter.
+        """
+        self.screen.fill((0, 0, 0))
+        fuente = pygame.font.SysFont(None, 72)
+        texto  = fuente.render("Cargando...", True, (255, 255, 255))
+        x = (Constantes.WIDTH  - texto.get_width())  // 2
+        y = (Constantes.HEIGHT - texto.get_height()) // 2
+        self.screen.blit(texto, (x, y))
+        pygame.display.flip()
