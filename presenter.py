@@ -396,8 +396,11 @@ class JuegoPresenter:
                     self.vista.eliminar_sprite_enemigo(i)
 
             else:
-                # Jugador muerto: limitar FPS igualmente para no saturar la CPU
-                self.vista.refrescar()
+                # Jugador muerto: avanzar la secuencia de Game Over.
+                delta_time = self.vista.refrescar()
+                self.vista.tick_game_over(delta_time)
+                if self.vista.game_over_terminado:
+                    self.ejecutando = False   # sale del loop → main.py vuelve al menú
 
             # 6. Renderizar
             estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)

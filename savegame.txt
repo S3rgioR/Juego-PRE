@@ -1,34 +1,18 @@
 {
   "hp": 5,
-  "hp_max": 6,
-  "num_enemigos_vivos": 6,
+  "hp_max": 5,
+  "num_enemigos_vivos": 5,
   "pos": [
-    193,
-    631
+    977,
+    -345
   ],
   "camara": [
-    -446.7892962436894,
-    90.99999896479999
+    337.0139549094705,
+    -885.0000000006576
   ],
-  "corazones_recogidos": [
-    0
-  ],
-  "num_nivel": 2,
-  "daga_desbloqueada": true,
+  "corazones_recogidos": [],
+  "num_nivel": 1,
+  "daga_desbloqueada": false,
   "boss_derrotado": true,
-  "daga_recogida": true,
-  "estado_niveles_anteriores": {
-    "hp": 5,
-    "hp_max": 6,
-    "num_enemigos_vivos": 5,
-    "daga_desbloqueada": false,
-    "pos_retroceso": [
-      3286,
-      -585
-    ],
-    "corazones_recogidos": [
-      0
-    ],
-    "daga_recogida": false
-  }
+  "daga_recogida": false
 }
