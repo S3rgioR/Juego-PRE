@@ -5,6 +5,7 @@ si el jugador está cerca para activarlo. Misma interfaz que PortalView.
 """
 
 import pygame
+import Fuentes
 
 
 class PortalFinalView:
@@ -55,7 +56,7 @@ class PortalFinalView:
         if not self.frames:
             return
         if self._fuente is None:
-            self._fuente = pygame.font.SysFont(None, 20)
+            self._fuente = Fuentes.obtener_fuente(20)
 
         frame      = self.frames[self.frame_idx]
         frame_rect = frame.get_rect(center=self.shape.center)

@@ -6,6 +6,7 @@ y tras unos segundos señaliza que hay que volver al menú.
 """
 
 import pygame
+import Fuentes
 
 
 class FinDeJuegoSequence:
@@ -38,8 +39,8 @@ class FinDeJuegoSequence:
         self._overlay.fill((0, 0, 0))
 
         # Fuentes
-        self._fuente_sub    = pygame.font.SysFont(None, 64)
-        self._fuente_titulo = pygame.font.SysFont(None, 96)
+        self._fuente_sub    = Fuentes.obtener_fuente(64)
+        self._fuente_titulo = Fuentes.obtener_fuente(96)
 
         # Captura del frame actual del juego (para el fade desde el juego)
         self._captura = screen.copy()

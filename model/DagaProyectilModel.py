@@ -28,7 +28,7 @@ class DagaProyectilModel:
         Daño que aplica al enemigo al impactar.
     """
 
-    VELOCIDAD    = 10
+    VELOCIDAD    = 12
     DISTANCIA_MAX = Constantes.WIDTH // 2   # píxeles de mundo máximos
     DAÑO         = 1
 

@@ -14,6 +14,7 @@ Devuelve una acción o None si el menú sigue abierto:
 
 import pygame
 import Constantes
+import Fuentes
 
 
 # ── Paleta (coordinada con MenuPrincipal pero más compacta) ─────────────────
@@ -42,8 +43,8 @@ class MenuPausa:
     OPCIONES = [
         ('reanudar',        'Volver a la partida'),
         ('cargar',          'Cargar partida'),
-        ('config',          'Configuración'),
-        ('menu_principal',  'Ir al menú principal'),
+        ('config',          'Configuracion'),
+        ('menu_principal',  'Ir al menu principal'),
     ]
 
     PANEL_ANCHO = 380
@@ -58,9 +59,9 @@ class MenuPausa:
         self.tiene_save = tiene_save
         self.seleccion  = 0
 
-        self._fuente_titulo = pygame.font.SysFont(None, 48)
-        self._fuente_btn    = pygame.font.SysFont(None, 34)
-        self._fuente_sub    = pygame.font.SysFont(None, 22)
+        self._fuente_titulo = Fuentes.obtener_fuente(48)
+        self._fuente_btn    = Fuentes.obtener_fuente(34)
+        self._fuente_sub    = Fuentes.obtener_fuente(22)
 
         # Panel centrado en pantalla
         self._panel_rect = pygame.Rect(
@@ -114,7 +115,7 @@ class MenuPausa:
         titulo = self._fuente_titulo.render("PAUSA", True, COLOR_TITULO)
         self._panel_surf.blit(
             titulo,
-            (self.PANEL_ANCHO // 2 - titulo.get_width() // 2, 22)
+            (self.PANEL_ANCHO // 2 - titulo.get_width() // 2, 22-18)
         )
 
         # Botones
@@ -151,11 +152,11 @@ class MenuPausa:
             )
 
         # Pista inferior
-        pista = self._fuente_sub.render("W S · Enter · clic", True, (90, 85, 110))
+        pista = self._fuente_sub.render("W S mover   Enter   clic", True, (90, 85, 110))
         self._panel_surf.blit(
             pista,
             (self.PANEL_ANCHO // 2 - pista.get_width() // 2,
-             self.PANEL_ALTO - 22)
+             self.PANEL_ALTO - 25)
         )
 
         self.screen.blit(self._panel_surf, self._panel_rect)

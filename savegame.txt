@@ -1,16 +1,18 @@
 {
-  "hp": 5,
-  "hp_max": 5,
-  "num_enemigos_vivos": 5,
+  "hp": 6,
+  "hp_max": 6,
+  "num_enemigos_vivos": 3,
   "pos": [
-    977,
+    996,
     -345
   ],
   "camara": [
-    337.0139549094705,
-    -885.0000000006576
+    356.00096679078223,
+    -885.0000079655864
   ],
-  "corazones_recogidos": [],
+  "corazones_recogidos": [
+    0
+  ],
   "num_nivel": 1,
   "daga_desbloqueada": false,
   "boss_derrotado": true,

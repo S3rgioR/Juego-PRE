@@ -32,7 +32,9 @@ Nota sobre convert_alpha():
 """
 
 import pygame
+import numpy
 import Constantes
+import Fuentes
 from model.Enemigo2Model import Enemigo2Model
 
 from .Event              import Event
@@ -117,6 +119,11 @@ class PygameView:
         # --- Checkpoint ---
         cx, cy = datos_checkpoint if datos_checkpoint else CHECKPOINT_NIVEL_1
         self.sprite_checkpoint = CheckpointView(cx, cy)
+
+        # --- HUD de vida (corazones) ---
+        self._frames_vida_hud = self._cargar_frames_vida_hud()
+        # --- HUD de inventario (slot + icono de daga) ---
+        self._frames_inventario_hud = self._cargar_frames_inventario_hud()
         # --- Fondos ---
         fondo_raw = pygame.image.load(
             "Assets/Enviorments/caverns-files-web/layers/background.png"
@@ -1152,21 +1159,186 @@ class PygameView:
     # HUD
     # ------------------------------------------------------------------
 
+    def _cargar_frames_vida_hud(self) -> dict:
+        """Carga los 3 estados visuales del corazón de vida del HUD.
+
+        Prueba la ruta indicada y, si falla, variantes razonables (mayúsculas/
+        minúsculas en 'assets', con y sin la 's' final, etc.) para tolerar
+        pequeñas discrepancias entre el nombre de carpeta esperado y el real,
+        ya que en Linux las rutas son sensibles a mayúsculas.
+
+        Returns
+        -------
+        dict
+            Claves 'lleno', 'medio', 'vacio' -> pygame.Surface escalada,
+            o dict vacío si los assets no están disponibles.
+        """
+        nombres = {
+            'lleno': "Hearts_Red_1.png",
+            'medio': "Hearts_Red_0.5.png",
+            'vacio': "Hearts_Red_0.png",
+        }
+        carpetas_candidatas = ["Assets/Interfaz/Vida/"]
+
+        frames = {}
+        for clave, nombre in nombres.items():
+            surface = None
+            for carpeta in carpetas_candidatas:
+                ruta = carpeta + nombre
+                try:
+                    surface = pygame.image.load(ruta).convert_alpha()
+                    if carpeta != carpetas_candidatas[0]:
+                        print(f"[HUD] ⚠ '{carpetas_candidatas[0] + nombre}' no encontrada; "
+                              f"usando '{ruta}' en su lugar.")
+                    break
+                except Exception:
+                    continue
+            if surface is None:
+                print(f"[HUD] ✗ No se pudo cargar ningún corazón '{nombre}' "
+                      f"en ninguna de las rutas probadas: "
+                      f"{[c + nombre for c in carpetas_candidatas]}")
+                return {}
+            w, h = surface.get_width(), surface.get_height()
+            frames[clave] = pygame.transform.scale(surface, (int(w * 1.0), int(h * 1.0)))
+
+        print(f"[HUD] ✓ Corazones de vida cargados "
+              f"({frames['lleno'].get_width()}x{frames['lleno'].get_height()} px)")
+        return frames
+
+    def _cargar_frames_inventario_hud(self) -> dict:
+        """Carga el slot de inventario y el icono de la daga del HUD.
+
+        El icono de daga se carga una vez en color y se genera además una
+        versión en gris (para mostrar mientras la habilidad está en
+        cooldown), evitando recalcular el grisado cada frame.
+
+        Returns
+        -------
+        dict
+            Claves 'slot', 'daga', 'daga_gris' -> pygame.Surface,
+            o dict vacío si los assets no están disponibles.
+        """
+        rutas = {
+            'slot': "Assets/Interfaz/Objeto/Inventory_Slot_1.png",
+            'daga': "Assets/Interfaz/Objeto/Daga.png",
+        }
+        carpetas_candidatas = ["", "assets/Interfaz/Objeto/", "Assets/interfaz/objeto/"]
+
+        frames = {}
+        for clave, ruta in rutas.items():
+            surface = None
+            # Primero la ruta tal cual; si falla, probar variantes de mayúsculas
+            candidatas = [ruta] + [
+                c + ruta.split('/')[-1] for c in carpetas_candidatas if c
+            ]
+            for r in candidatas:
+                try:
+                    surface = pygame.image.load(r).convert_alpha()
+                    break
+                except Exception:
+                    continue
+            if surface is None:
+                print(f"[HUD] ✗ No se pudo cargar '{ruta}' para el HUD de inventario.")
+                return {}
+            frames[clave] = surface
+
+        # Versión en gris del icono de daga (cooldown activo)
+        gris = frames['daga'].copy()
+        arr   = pygame.surfarray.pixels3d(gris)
+        alpha = pygame.surfarray.pixels_alpha(gris)
+        mask  = alpha > 0
+        promedio = (
+            arr[:, :, 0][mask].astype(int)
+            + arr[:, :, 1][mask].astype(int)
+            + arr[:, :, 2][mask].astype(int)
+        ) // 3
+        arr[:, :, 0][mask] = promedio
+        arr[:, :, 1][mask] = promedio
+        arr[:, :, 2][mask] = promedio
+        del arr, alpha
+        frames['daga_gris'] = gris
+
+        print("[HUD] ✓ Iconos de inventario cargados")
+        return frames
+
+    def _dibujar_corazones_vida(self, hp, hp_max):
+        """Dibuja la fila de corazones de vida en la esquina superior izquierda.
+
+        El número de corazones mostrados es siempre hp_max (redondeado al
+        entero superior, por si hp_max llegase a ser fraccionario). Se
+        rellenan de izquierda a derecha según hp: los corazones íntegros
+        primero, luego como máximo un corazón a medias, y el resto vacíos.
+
+        Parameters
+        ----------
+        hp : int or float
+            Vida actual del jugador (puede ser fraccionaria, p.ej. 3.5).
+        hp_max : int or float
+            Vida máxima del jugador.
+        """
+        num_corazones = int(round(hp_max))
+        if num_corazones <= 0:
+            return
+
+        img_w = self._frames_vida_hud['lleno'].get_width()
+        margen_izq = 20
+        margen_sup = 20
+        espaciado  = img_w + 6   # misma distancia entre todos los corazones
+
+        hp_restante = max(0.0, hp)
+
+        for i in range(num_corazones):
+            if hp_restante >= 1:
+                clave = 'lleno'
+                hp_restante -= 1
+            elif hp_restante >= 0.5:
+                clave = 'medio'
+                hp_restante -= 0.5
+            else:
+                clave = 'vacio'
+
+            img = self._frames_vida_hud[clave]
+            x = margen_izq + i * espaciado
+            self.screen.blit(img, (x, margen_sup))
+
     def dibujar_hud(self, estado_jugador):
-        fuente = pygame.font.SysFont(None, 36)
+        fuente = Fuentes.obtener_fuente(36)
 
         hp     = estado_jugador['hp']
         hp_max = estado_jugador.get('hp_max', hp)
-        texto_hp = fuente.render(f"Vidas: {hp} / {hp_max}", True, (255, 255, 255))
-        self.screen.blit(texto_hp, (20, 20))
 
-        # Indicador de daga desbloqueada + cooldown
-        if estado_jugador.get('daga_desbloqueada'):
+        if self._frames_vida_hud:
+            self._dibujar_corazones_vida(hp, hp_max)
+        else:
+            # Fallback a texto si los assets no cargaron
+            texto_hp = fuente.render(f"Vidas: {hp} / {hp_max}", True, (255, 255, 255))
+            self.screen.blit(texto_hp, (20, 20))
+
+        # Slot de inventario (siempre visible) + icono de daga (si desbloqueada)
+        if self._frames_inventario_hud:
+            y_slot = (20 + self._frames_vida_hud['lleno'].get_height() + 10
+                      if self._frames_vida_hud else 52)
+            slot_x, slot_y = 20, y_slot
+            slot = self._frames_inventario_hud['slot']
+            self.screen.blit(slot, (slot_x, slot_y))
+
+            if estado_jugador.get('daga_desbloqueada'):
+                listo = estado_jugador.get('cooldown_daga_listo', True)
+                icono = (self._frames_inventario_hud['daga'] if listo
+                         else self._frames_inventario_hud['daga_gris'])
+                # Icono centrado dentro del slot (objeto colocado en su hueco)
+                icono_x = slot_x + (slot.get_width()  - icono.get_width())  // 2
+                icono_y = slot_y + (slot.get_height() - icono.get_height()) // 2
+                self.screen.blit(icono, (icono_x, icono_y))
+        elif estado_jugador.get('daga_desbloqueada'):
+            # Fallback a texto si los assets de inventario no cargaron
             listo = estado_jugador.get('cooldown_daga_listo', True)
             color = (100, 220, 255) if listo else (140, 140, 140)
             texto_daga = fuente.render(
                 "[L] Daga" + (" ✓" if listo else " …"), True, color)
-            self.screen.blit(texto_daga, (20, 52))
+            y_daga = (20 + self._frames_vida_hud['lleno'].get_height() + 8
+                      if self._frames_vida_hud else 52)
+            self.screen.blit(texto_daga, (20, y_daga))
 
     @property
     def game_over_terminado(self) -> bool:

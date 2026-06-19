@@ -12,6 +12,7 @@ Diseño:
 
 import pygame
 import Constantes
+import Fuentes
 from MenuConfig import MenuConfig
 
 from view.AudioManager import AudioManager
@@ -43,7 +44,7 @@ class MenuPrincipal:
     OPCIONES = [
         ('jugar',    'Jugar'),
         ('cargar',   'Cargar partida'),
-        ('config',   'Configuración'),
+        ('config',   'Configuracion'),
         ('salir',    'Salir'),
     ]
 
@@ -53,16 +54,16 @@ class MenuPrincipal:
     BTN_RADIO  = 8        # redondeo de esquinas
 
     def __init__(self, screen: pygame.Surface, tiene_save: bool = False, audio=None,
-                 fondo_path: str = "Assets/Enviorments/caverns-files-web/layers/background.png",):
+                 fondo_path: str = "Assets/Enviorments/Fondo Pantalla de inicio/background.png",):
         self.screen     = screen
         self.tiene_save = tiene_save
         self.seleccion  = 0   # índice del botón resaltado con teclado
         self._audio = audio
 
         # Fuentes
-        self._fuente_titulo = pygame.font.SysFont(None, 96)
-        self._fuente_btn    = pygame.font.SysFont(None, 38)
-        self._fuente_sub    = pygame.font.SysFont(None, 26)
+        self._fuente_titulo = Fuentes.obtener_fuente(96)
+        self._fuente_btn    = Fuentes.obtener_fuente(38)
+        self._fuente_sub    = Fuentes.obtener_fuente(26)
 
         # Fondo escalado al tamaño de la ventana
         try:
@@ -115,11 +116,11 @@ class MenuPrincipal:
         )
 
         # Subtítulo decorativo
-        sub = self._fuente_sub.render("· Menú Principal ·", True, (150, 140, 100))
+        sub = self._fuente_sub.render(" Menu Principal ", True, (150, 140, 100))
         self.screen.blit(
             sub,
             (Constantes.WIDTH // 2 - sub.get_width() // 2,
-             Constantes.HEIGHT // 2 - 120)
+             Constantes.HEIGHT // 2 - 130)
         )
 
         # Botones
@@ -163,7 +164,7 @@ class MenuPrincipal:
 
         # Pista de controles
         pista = self._fuente_sub.render(
-            "Apreta w s para navegar   ·   Apreta Enter o clica para seleccionar",
+            "Apreta w s para navegar       Apreta Enter o clica para seleccionar",
             True, (100, 95, 120)
         )
         self.screen.blit(

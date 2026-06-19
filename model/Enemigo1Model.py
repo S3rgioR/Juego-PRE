@@ -18,7 +18,7 @@ class Enemigo1Model(Actor):
 
         self.rango_vision    = 250   # px — rango en el que detecta al jugador
         self.rango_ataque    = 100   # px — distancia a la que ataca
-        self.cooldown_ataque = 2500
+        self.cooldown_ataque = 2000
         self.ultimo_ataque   = -self.cooldown_ataque
 
         self._frame_index       = 0
