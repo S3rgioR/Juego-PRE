@@ -55,6 +55,7 @@ from .PortalView import PortalView
 from .ParedBossView import ParedBossView
 from .PortalFinalView    import PortalFinalView
 from .FinDeJuegoSequence import FinDeJuegoSequence
+from .GameOverSequence   import GameOverSequence
 
 class PygameView:
     """Gestiona física, entrada, cámara, sprites y renderizado del juego.
@@ -321,6 +322,9 @@ class PygameView:
         # --- Muerte del boss: flag para disparar una sola vez ---
         self._boss_muerte_disparada = False
 
+        # --- Secuencia de Game Over ---
+        self._seq_game_over: GameOverSequence | None = None
+
     # ------------------------------------------------------------------
     # Acceso a datos compartidos con el Presenter
     # ------------------------------------------------------------------
@@ -353,6 +357,10 @@ class PygameView:
         """
         self.sprite_jugador.shape.center = (x, y)
         self.sprite_jugador._hitbox_ataque_cache = None
+        # Sincronizar el float interno _y con la nueva posición.
+        # Sin esto, la física parte del _y antiguo el frame siguiente
+        # y empuja al jugador de vuelta a donde estaba antes de cargar.
+        self.sprite_jugador._y_override = float(self.sprite_jugador.shape.y)
 
     def restaurar_corazones_recogidos(self, indices: set):
         for c in self.sprites_corazones:
@@ -655,6 +663,12 @@ class PygameView:
                                      # actuar como suelo (solo si veniamos de arriba)
 
         jugador_m._y  = getattr(jugador_m, '_y', float(shape.y))
+        # Si restaurar_pos_jugador fijó un override (carga de partida),
+        # usarlo y descartarlo para que la física parta de la posición correcta.
+        override = getattr(self.sprite_jugador, '_y_override', None)
+        if override is not None:
+            jugador_m._y = override
+            del self.sprite_jugador._y_override
         jugador_m._y += jugador_m.velocidad_y
         shape.y        = int(jugador_m._y) + 1
 
@@ -977,6 +991,15 @@ class PygameView:
             pygame.draw.rect(self.screen, (0, 255, 100),
                              self.camara.aplicar(self._trigger_fin_nivel), 3)
 
+        # --- Secuencia de Game Over ---
+        # Al detectar que el jugador acaba de morir, capturamos el frame
+        # actual (el juego «congelado») y arrancamos el fade a negro.
+        if not estado_jugador['vivo']:
+            if self._seq_game_over is None:
+                captura = self.screen.copy()
+                self._seq_game_over = GameOverSequence(self.screen, captura)
+            self._seq_game_over.draw()
+
         # 7. Presentar frame
         pygame.display.flip()
 
@@ -1145,9 +1168,27 @@ class PygameView:
                 "[L] Daga" + (" ✓" if listo else " …"), True, color)
             self.screen.blit(texto_daga, (20, 52))
 
-        if not estado_jugador['vivo']:
-            fuente_grande = pygame.font.SysFont(None, 120)
-            texto_go = fuente_grande.render("GAME OVER", True, (220, 50, 50))
-            x = (Constantes.WIDTH  - texto_go.get_width())  // 2
-            y = (Constantes.HEIGHT - texto_go.get_height()) // 2
-            self.screen.blit(texto_go, (x, y))
+    @property
+    def game_over_terminado(self) -> bool:
+        """True cuando la secuencia de Game Over ha finalizado."""
+        return self._seq_game_over is not None and self._seq_game_over.terminado
+
+    def tick_game_over(self, delta_ms: int):
+        """Avanza el timer de la secuencia de Game Over si está activa."""
+        if self._seq_game_over and not self._seq_game_over.terminado:
+            self._seq_game_over.actualizar(delta_ms)
+
+    def dibujar_pantalla_cargando(self):
+        """Pinta un overlay negro con 'Cargando...' centrado en pantalla.
+
+        Se llama cada frame durante el estado de carga post-restauración,
+        mientras la física resuelve la posición del jugador en silencio.
+        No llama a pygame.display.flip() — lo gestiona el presenter.
+        """
+        self.screen.fill((0, 0, 0))
+        fuente = pygame.font.SysFont(None, 72)
+        texto  = fuente.render("Cargando...", True, (255, 255, 255))
+        x = (Constantes.WIDTH  - texto.get_width())  // 2
+        y = (Constantes.HEIGHT - texto.get_height()) // 2
+        self.screen.blit(texto, (x, y))
+        pygame.display.flip()

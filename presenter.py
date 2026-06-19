@@ -100,6 +100,14 @@ class JuegoPresenter:
         self._seq_activa = False
         self.vista.evt_tecla_e.add_listener(self._usar_portal)
 
+        # Pantalla de carga: True mientras se muestra el overlay negro
+        self._cargando        = False
+        # Número de frames físicos que se ejecutan con overlay visible
+        # antes de quitar la pantalla. 10 frames ≈ 166 ms a 60 FPS:
+        # suficiente para que la física resuelva colisiones post-carga.
+        self._frames_carga    = 0
+        self._FRAMES_ESPERA   = 30
+
     # --- Handlers de eventos ---
     def _nivel_completado(self):
         self.nivel_completado = True
@@ -266,6 +274,9 @@ class JuegoPresenter:
             if 'pos' in datos:
                 x, y = datos['pos']
                 self.vista.restaurar_pos_jugador(int(x), int(y))
+                # Resetear velocidad vertical para que el jugador no llegue
+                # con inercia acumulada del estado anterior al punto de carga.
+                self.modelo.jugador.velocidad_y = 0
             if 'camara' in datos:
                 self.vista.restaurar_camara(*datos['camara'])
             if 'corazones_recogidos' in datos:
@@ -288,6 +299,10 @@ class JuegoPresenter:
             self._estado_jugador_previo = datos.get('estado_niveles_anteriores', None)
 
             self.vista.sprite_checkpoint.activar()
+            # Activar pantalla de carga: congela el loop visible hasta que
+            # la física haya resuelto la posición guardada correctamente.
+            self._cargando     = True
+            self._frames_carga = self._FRAMES_ESPERA
             print("[Presenter] ✓ Partida cargada")
         except Exception as e:
             print(f"[Presenter] ✗ Error al cargar: {e}")
@@ -312,6 +327,32 @@ class JuegoPresenter:
             if self._pausado:
                 self.vista.refrescar()   # limita FPS también en pausa
                 self._procesar_pausa(events)
+                continue
+
+            # --- Pantalla de carga post-restauración ---
+            # Mientras _cargando es True: ejecutamos la física en silencio
+            # (para que el motor resuelva colisiones con el entorno) y
+            # pintamos un overlay negro con "Cargando..." en pantalla.
+            # Solo salimos cuando se han procesado _FRAMES_ESPERA frames.
+            if self._cargando:
+                # Procesar salida de ventana incluso durante la carga
+                for event in events:
+                    if event.type == pygame.QUIT:
+                        self.ejecutando = False
+                        self.salida_forzada = True
+                        break
+
+                delta_time = self.vista.refrescar()
+                # Ejecutar física para que el jugador quede bien colocado
+                self.vista.actualizar_fisica(self.modelo, delta_time)
+                self.modelo.tick(delta_time)
+
+                # Dibujar overlay negro con texto
+                self.vista.dibujar_pantalla_cargando()
+
+                self._frames_carga -= 1
+                if self._frames_carga <= 0:
+                    self._cargando = False
                 continue
 
             # Eventos diferidos de muerte del boss
@@ -355,8 +396,11 @@ class JuegoPresenter:
                     self.vista.eliminar_sprite_enemigo(i)
 
             else:
-                # Jugador muerto: limitar FPS igualmente para no saturar la CPU
-                self.vista.refrescar()
+                # Jugador muerto: avanzar la secuencia de Game Over.
+                delta_time = self.vista.refrescar()
+                self.vista.tick_game_over(delta_time)
+                if self.vista.game_over_terminado:
+                    self.ejecutando = False   # sale del loop → main.py vuelve al menú
 
             # 6. Renderizar
             estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
