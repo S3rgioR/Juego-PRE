@@ -54,7 +54,7 @@ class MenuPrincipal:
     BTN_RADIO  = 8        # redondeo de esquinas
 
     def __init__(self, screen: pygame.Surface, tiene_save: bool = False, audio=None,
-                 fondo_path: str = "Assets/Enviorments/caverns-files-web/layers/background.png",):
+                 fondo_path: str = "Assets/Enviorments/Fondo Pantalla de inicio/background.png",):
         self.screen     = screen
         self.tiene_save = tiene_save
         self.seleccion  = 0   # índice del botón resaltado con teclado
@@ -164,7 +164,7 @@ class MenuPrincipal:
 
         # Pista de controles
         pista = self._fuente_sub.render(
-            "Apreta w s para navegar      Apreta Enter o clica para seleccionar",
+            "Apreta w s para navegar       Apreta Enter o clica para seleccionar",
             True, (100, 95, 120)
         )
         self.screen.blit(

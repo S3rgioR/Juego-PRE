@@ -145,7 +145,7 @@ class MenuConfig:
         # Botón Volver — en pantalla
         btn = pygame.Rect(0, 0, self.BTN_ANCHO, self.BTN_ALTO)
         btn.centerx = cx
-        btn.bottom  = self._panel_rect.bottom - 22
+        btn.bottom  = self._panel_rect.bottom - 40
         self._btn_volver_rect = btn
 
     # ── Helpers locales ──────────────────────────────────────────────────────

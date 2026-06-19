@@ -1,14 +1,14 @@
 {
   "hp": 6,
   "hp_max": 6,
-  "num_enemigos_vivos": 1,
+  "num_enemigos_vivos": 3,
   "pos": [
-    944,
+    996,
     -345
   ],
   "camara": [
-    304.1368292804802,
-    -885.0234745560075
+    356.00096679078223,
+    -885.0000079655864
   ],
   "corazones_recogidos": [
     0
