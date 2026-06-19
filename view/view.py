@@ -34,6 +34,7 @@ Nota sobre convert_alpha():
 import pygame
 import numpy
 import Constantes
+import Fuentes
 from model.Enemigo2Model import Enemigo2Model
 
 from .Event              import Event
@@ -1278,7 +1279,7 @@ class PygameView:
             self.screen.blit(img, (x, margen_sup))
 
     def dibujar_hud(self, estado_jugador):
-        fuente = pygame.font.SysFont(None, 36)
+        fuente = Fuentes.obtener_fuente(36)
 
         hp     = estado_jugador['hp']
         hp_max = estado_jugador.get('hp_max', hp)
@@ -1317,7 +1318,7 @@ class PygameView:
             self.screen.blit(texto_daga, (20, y_daga))
 
         if not estado_jugador['vivo']:
-            fuente_grande = pygame.font.SysFont(None, 120)
+            fuente_grande = Fuentes.obtener_fuente(120)
             texto_go = fuente_grande.render("GAME OVER", True, (220, 50, 50))
             x = (Constantes.WIDTH  - texto_go.get_width())  // 2
             y = (Constantes.HEIGHT - texto_go.get_height()) // 2

@@ -6,6 +6,7 @@ el punto de guardado. Sin lógica compleja.
 
 import pygame
 import numpy
+import Fuentes
 
 
 class CheckpointView:
@@ -18,7 +19,7 @@ class CheckpointView:
         self.shape = pygame.Rect(0, 0, self.image.get_width(), self.image.get_height())
         self.shape.center = (x, y)
         self._mostrar_prompt = False
-        self._fuente         = None
+        self._fuente         = Fuentes.obtener_fuente(20)
         self._inicio_azul    = 0
         self._efecto_activo  = False
 
@@ -62,7 +63,7 @@ class CheckpointView:
 
         # Prompt de interacción
         if self._mostrar_prompt:
-            texto = self._fuente.render("[K] Guardar", True, (255, 255, 255))
+            texto = self._fuente.render("[K] Guardar", True, (50, 50, 255))
             rect_pantalla = camara.aplicar(self.shape)
             interfaz.blit(texto, (rect_pantalla.centerx - texto.get_width() // 2,
                                    rect_pantalla.top - 22))

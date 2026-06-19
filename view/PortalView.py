@@ -1,6 +1,7 @@
 """Sprite visual del portal (fin de nivel y regreso al anterior)."""
 
 import pygame
+import Fuentes
 
 
 class PortalView:
@@ -32,7 +33,7 @@ class PortalView:
 
     def draw(self, interfaz: pygame.Surface, camara) -> None:
         if self._fuente is None:
-            self._fuente = pygame.font.SysFont(None, 20)
+            self._fuente = Fuentes.obtener_fuente(20)
 
         # Avanzar animación
         ahora = pygame.time.get_ticks()

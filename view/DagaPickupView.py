@@ -8,6 +8,7 @@ El save system guarda si ya fue recogida.
 """
 
 import pygame
+import Fuentes
 
 
 class DagaPickupView:
@@ -28,7 +29,7 @@ class DagaPickupView:
         self.shape = pygame.Rect(0, 0, imagen.get_width(), imagen.get_height())
         self.shape.center = (x, y)
 
-        self._fuente = None
+        self._fuente = Fuentes.obtener_fuente(20)
 
     # ------------------------------------------------------------------ #
 

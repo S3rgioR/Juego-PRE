@@ -11,6 +11,7 @@ Controles:
 
 import pygame
 import Constantes
+import Fuentes
 
 # ── Paleta (igual que MenuPausa) ────────────────────────────────────────────
 COLOR_PANEL_FONDO  = (15,  15,  35, 220)
@@ -54,13 +55,13 @@ class MenuConfig:
 
     SLIDERS = [
         ('general', 'Volumen general'),
-        ('musica',  'Música de fondo'),
+        ('musica',  'Musica de fondo'),
         ('sfx',     'Efectos de sonido'),
     ]
 
     # Controles del juego para mostrar en la subpantalla
     CONTROLES = [
-        ('A / D',        'Mover izquierda / derecha'),
+        ('A / D',        'Mover izq. / der.'),
         ('W / S',        'Mover arriba / abajo'),
         ('Espacio',      'Saltar'),
         ('J',            'Atacar'),
@@ -79,14 +80,14 @@ class MenuConfig:
         self.seleccion   = 0
         self._arrastando = False
 
-        self._fuente_titulo  = pygame.font.SysFont(None, 40)
-        self._fuente_tab     = pygame.font.SysFont(None, 28)
-        self._fuente_label   = pygame.font.SysFont(None, 29)
-        self._fuente_valor   = pygame.font.SysFont(None, 27)
-        self._fuente_btn     = pygame.font.SysFont(None, 30)
-        self._fuente_sub     = pygame.font.SysFont(None, 21)
-        self._fuente_tecla   = pygame.font.SysFont(None, 25)
-        self._fuente_control = pygame.font.SysFont(None, 26)
+        self._fuente_titulo  = Fuentes.obtener_fuente(40)
+        self._fuente_tab     = Fuentes.obtener_fuente(28)
+        self._fuente_label   = Fuentes.obtener_fuente(29)
+        self._fuente_valor   = Fuentes.obtener_fuente(27)
+        self._fuente_btn     = Fuentes.obtener_fuente(30)
+        self._fuente_sub     = Fuentes.obtener_fuente(21)
+        self._fuente_tecla   = Fuentes.obtener_fuente(25)
+        self._fuente_control = Fuentes.obtener_fuente(26)
 
         # Panel centrado
         self._panel_rect = pygame.Rect(0, 0, self.PANEL_ANCHO, self.PANEL_ALTO)
@@ -161,7 +162,7 @@ class MenuConfig:
         pygame.draw.rect(s, COLOR_PANEL_BORDE, s.get_rect(), width=2, border_radius=12)
 
         # Título
-        titulo = self._fuente_titulo.render("CONFIGURACIÓN", True, COLOR_TITULO)
+        titulo = self._fuente_titulo.render("CONFIGURACION", True, COLOR_TITULO)
         s.blit(titulo, (self.PANEL_ANCHO // 2 - titulo.get_width() // 2, 16))
 
         # Tabs
@@ -200,7 +201,7 @@ class MenuConfig:
             pista_txt = "Esc para volver"
         pista = self._fuente_sub.render(pista_txt, True, (90, 85, 110))
         s.blit(pista, (self.PANEL_ANCHO // 2 - pista.get_width() // 2,
-                       self.PANEL_ALTO - 20))
+                       self.PANEL_ALTO - 30))
 
         self.screen.blit(s, self._panel_rect)
 

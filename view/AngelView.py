@@ -9,6 +9,7 @@ Ruta de assets: Assets/Characters/angel/sprites/angel[1-8].png
 
 import pygame
 import numpy
+import Fuentes
 
 
 class AngelView:
@@ -75,7 +76,7 @@ class AngelView:
 
     def draw(self, interfaz: pygame.Surface, camara) -> None:
         if self._fuente is None:
-            self._fuente = pygame.font.SysFont(None, 20)
+            self._fuente = Fuentes.obtener_fuente(20)
 
         self._avanzar_frame()
         frame_base = self.frames[self.frame_index]
