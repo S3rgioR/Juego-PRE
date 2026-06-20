@@ -508,6 +508,19 @@ class PygameView:
             self.sprite_jugador.shape, modelo.jugador.flip)
             if modelo.jugador.atacando else None)
 
+        # Detectar muerte del boss en este frame. Se comprueba ANTES del
+        # `if ... modelo.boss.vivo:` de abajo y sin depender de él: el
+        # daño que mata al boss se aplica en el Presenter (tras procesar
+        # los `eventos` que devuelve este mismo método), así que el
+        # primer frame en que `modelo.boss.vivo` es False ya es el
+        # siguiente a actualizar_fisica() — y si esta comprobación
+        # viviera dentro del bloque `if modelo.boss.vivo:`, jamás podría
+        # cumplirse (la condición exterior ya la habría descartado).
+        if self.sprite_boss and modelo.boss and not modelo.boss.vivo and not self._boss_muerte_disparada:
+            self._disparar_efectos_muerte_boss()
+            if self.pared_boss:
+                self.pared_boss.activa = False
+
         if self.sprite_boss and modelo.boss and modelo.boss.vivo:
             modelo.boss._x = float(self.sprite_boss.shape.centerx)
             modelo.boss._y = float(self.sprite_boss.shape.centery)
@@ -560,11 +573,6 @@ class PygameView:
             hitbox_espada2 = self.sprite_jugador.hitbox_ataque
             if hitbox_espada2 and hitbox_espada2.colliderect(self.sprite_boss.shape):
                 eventos.append(('golpe_jugador_a_boss', None))
-            # Detectar muerte del boss en este frame
-            if not modelo.boss.vivo and not self._boss_muerte_disparada:
-                self._disparar_efectos_muerte_boss()
-                if self.pared_boss:  # ← añadir
-                    self.pared_boss.activa = False
 
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
 
