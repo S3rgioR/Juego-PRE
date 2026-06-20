@@ -9,7 +9,7 @@ from presenter     import JuegoPresenter
 from Nivel         import NIVELES
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
-from view.AudioManager import AudioManager
+from view import AudioManager
 from LevelParser import LevelParser
 def escalar_img(image, scale):
     w, h = image.get_width(), image.get_height()
@@ -205,6 +205,12 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         if estado_jugador_previo.get('viene_de_retroceso') and 'pos_retroceso' in estado_jugador_previo:
             x, y = estado_jugador_previo['pos_retroceso']
             vista.restaurar_pos_jugador(int(x), int(y))
+
+        # Se entra a este nivel atravesando un portal (avance o retroceso),
+        # no en el primer arranque de la partida: mostrar la misma pantalla
+        # de "Cargando..." que se usa al cargar partida, con el mismo
+        # bloqueo total del juego mientras la física resuelve la posición.
+        presenter.activar_pantalla_carga()
 
     presenter.ejecutar()
 

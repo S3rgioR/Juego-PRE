@@ -2,46 +2,62 @@
 
 import pygame
 import Constantes
-from .Actor import Actor
+from .EnemigoModel import EnemigoModel
+from .Event import Event
 
 
-class Enemigo1Model(Actor):
+class OgroModel(EnemigoModel):
+    """Patrullador terrestre con persecución y ataque cuerpo a cuerpo."""
+
+    usa_gravedad = True
     COOLDOWN_ANIM = 200
 
     def __init__(self, x, y, distancia_patrulla=150, num_frames_ataque=6):
-        super().__init__(hp=5, iframe_duracion=600)
-        self.flip      = True
-        self.velocidad = 2
+        super().__init__(
+            x, hp=5, iframe_duracion=600,
+            distancia_patrulla=distancia_patrulla,
+            velocidad=2, rango_vision=250,
+        )
 
-        self.patrol_min = x - distancia_patrulla
-        self.patrol_max = x + distancia_patrulla
-
-        self.rango_vision    = 250   # px — rango en el que detecta al jugador
         self.rango_ataque    = 100   # px — distancia a la que ataca
         self.cooldown_ataque = 2000
-        self.ultimo_ataque   = -self.cooldown_ataque
+        self._timer_ataque   = 0   # ms restantes hasta poder atacar de nuevo
 
         self._frame_index       = 0
-        self._update_time       = pygame.time.get_ticks()
+        self._anim_timer        = 0   # ms acumulados desde el último frame de ataque
         self._num_frames_ataque = num_frames_ataque
 
         self.ataque_frame_inicio = 2
         self.ataque_frame_fin    = 5
 
-        # --- Persecución ---
-        self.persiguiendo          = False   # True mientras sigue al jugador
-        self._exclamacion_nueva    = False   # True solo el frame que detecta
         self.velocidad_persecucion = 3       # px/frame al perseguir
-        self._alertado_por_golpe   = False   # True el frame en que recibe un golpe
+
+        # Notificación de ataque: el Presenter se suscribe vía JuegoModel,
+        # sin necesidad de importar Enemigo1Model directamente.
+        self.evt_ataque = Event()
 
     # --- IA ---
 
     def tick_ia(self, pos_enemigo, pos_jugador, delta_time_ms, tiles_solidos=None):
+        """Ejecuta un tick de IA.
+
+        Parameters
+        ----------
+        pos_enemigo, pos_jugador : tuple of (float, float)
+            Centros en coordenadas de mundo.
+        delta_time_ms : int
+        tiles_solidos : list of tuple, optional
+            Bounding boxes puros (left, top, right, bottom) de los tiles
+            sólidos, usados solo para el raycast de _hay_pared_entre.
+            Nunca objetos de la Vista (p. ej. Plataforma).
+        """
         if not self.vivo:
             return 0, None
 
-        self._tick_iframes(delta_time_ms)
-        self._exclamacion_nueva = False
+        self._iniciar_tick_ia(delta_time_ms)
+
+        if self._timer_ataque > 0:
+            self._timer_ataque = max(0, self._timer_ataque - delta_time_ms)
 
         ex, ey = pos_enemigo
         jx, jy = pos_jugador
@@ -60,41 +76,41 @@ class Enemigo1Model(Actor):
             and not self._hay_pared_entre(pos_enemigo, pos_jugador, tiles_solidos)
         )
 
-        # Alerta por golpe: girar hacia el jugador y entrar en modo alerta
-        # NO se fuerza persiguiendo aquí — se gestiona abajo junto al resto
-        if self._alertado_por_golpe:
-            self._alertado_por_golpe = False
+        # Alerta por golpe: girar hacia el jugador y entrar en modo alerta.
+        # Si el jugador está en otra plataforma muy por encima/debajo
+        # (más de 16 px en Y), el golpe se ignora a efectos de persecución:
+        # el enemigo terrestre no "detecta" a alguien fuera de su alcance
+        # de altura, aunque lo haya golpeado (p. ej. con un proyectil/daga
+        # lanzada desde arriba).
+        if self._consumir_alerta() and abs(dy) <= 16:
             if not self.atacando:          # no interrumpir un ataque en curso
                 self.flip = dx < 0
             if not self.persiguiendo:
-                self.persiguiendo       = True
-                self._exclamacion_nueva = True
-                if hasattr(self, 'on_deteccion'):
-                    self.on_deteccion()
+                self._iniciar_persecucion()
 
         # Transición patrulla → persecución (detección visual frontal)
         if ve_al_jugador and not self.persiguiendo:
-            self.persiguiendo       = True
-            self._exclamacion_nueva = True
-            if hasattr(self, 'on_deteccion'):
-                self.on_deteccion()
+            self._iniciar_persecucion()
 
         # Transición persecución → patrulla:
         # En modo alerta conoce la posición del jugador aunque esté de espaldas,
-        # pero deja de perseguir si el jugador se aleja más del rango de visión.
-        if self.persiguiendo and dist > self.rango_vision:
+        # pero deja de perseguir si el jugador se aleja más del rango de visión,
+        # o si está en una plataforma a una altura (Y) muy distinta de la suya
+        # (más de 16 px): aunque haya exclamación/alerta por golpe, un enemigo
+        # terrestre no debería "ignorar la física" y perseguir a alguien que
+        # está en otro nivel de plataforma fuera de su alcance.
+        if self.persiguiendo and (dist > self.rango_vision or abs(dy) > 16):
             self.persiguiendo = False
 
-        ahora          = pygame.time.get_ticks()
-        cooldown_listo = (ahora - self.ultimo_ataque) >= self.cooldown_ataque
+        cooldown_listo = self._timer_ataque <= 0
 
         # Atacar si está en rango de ataque, persiguiendo Y cooldown listo
         en_rango_ataque = self.persiguiendo and dist <= self.rango_ataque
         if en_rango_ataque and cooldown_listo and not self.atacando:
             self.atacando      = True
             self._frame_index  = 0
-            self._update_time  = ahora
-            self.ultimo_ataque = ahora
+            self._anim_timer   = 0
+            self._timer_ataque = self.cooldown_ataque
 
         delta_x = 0
         if not self.atacando:
@@ -108,9 +124,10 @@ class Enemigo1Model(Actor):
             else:
                 delta_x = self._calcular_patrulla(ex)
         else:
-            if pygame.time.get_ticks() - self._update_time > self.COOLDOWN_ANIM:
+            self._anim_timer += delta_time_ms
+            if self._anim_timer > self.COOLDOWN_ANIM:
                 self._frame_index += 1
-                self._update_time  = pygame.time.get_ticks()
+                self._anim_timer   = 0
 
             if self._frame_index >= self._num_frames_ataque:
                 self.atacando      = False
@@ -120,36 +137,13 @@ class Enemigo1Model(Actor):
                 if self._frame_index == self.ataque_frame_inicio:
                     if not getattr(self, '_sonido_ataque_emitido', False):
                         self._sonido_ataque_emitido = True
-                        if hasattr(self, 'on_ataque'):
-                            self.on_ataque()
+                        self.evt_ataque.emit()
                 self.hitbox_ataque = self._calcular_hitbox_ataque(ex, ey)
             else:
                 self._sonido_ataque_emitido = False
                 self.hitbox_ataque = None
 
         return delta_x, self.hitbox_ataque
-
-    def recibir_daño(self, cantidad):
-        """Marca el flag para que tick_ia gire y persiga al atacante."""
-        ya_persiguiendo = self.persiguiendo
-        super().recibir_daño(cantidad)
-        if self.vivo and not ya_persiguiendo:
-            self._alertado_por_golpe = True
-
-    def _hay_pared_entre(self, pos_a, pos_b, tiles):
-        if not tiles:
-            return False
-        ax, ay = pos_a
-        bx, by = pos_b
-        pasos  = max(abs(bx - ax), abs(by - ay)) // 8 + 1
-        for i in range(1, pasos):
-            t  = i / pasos
-            px = int(ax + (bx - ax) * t)
-            py = int(ay + (by - ay) * t)
-            for tile in tiles:
-                if tile.shape.collidepoint(px, py):
-                    return True
-        return False
 
     def _calcular_hitbox_ataque(self, ex, ey):
         ancho_hit  = Constantes.WIDTH_PERSONAJE * 4

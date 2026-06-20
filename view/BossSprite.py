@@ -20,8 +20,8 @@ Efectos visuales
 
 import math
 import pygame
-import numpy
 import Constantes
+from .VisualEffects import aplicar_tinte
 
 
 class BossSprite:
@@ -181,10 +181,10 @@ class BossSprite:
         # --- Efecto de color ---
         if self._embestida_activa:
             # Rojo intenso + más opaco (diferente al iframe normal)
-            img_final = self._aplicar_tinte(imagen_flip, r=220, g=0, b=0, intensidad=0.75)
+            img_final = aplicar_tinte(imagen_flip, r=220, g=0, b=0, intensidad=0.75)
         elif self._iframe_activo:
             # Rojo suave estándar
-            img_final = self._aplicar_tinte(imagen_flip, r=180, g=0, b=0, intensidad=0.40)
+            img_final = aplicar_tinte(imagen_flip, r=180, g=0, b=0, intensidad=0.40)
         else:
             img_final = imagen_flip
 
@@ -212,25 +212,6 @@ class BossSprite:
 
             for i, ep in enumerate(proyectiles_vivos):
                 self._sprites_proyectiles[i].draw(interfaz, camara, ep)
-
-    def _aplicar_tinte(self, imagen, r, g, b, intensidad=0.5):
-        """Devuelve una copia de la imagen con un tinte de color mezclado."""
-        resultado = imagen.convert_alpha()
-        arr   = pygame.surfarray.pixels3d(resultado)
-        alpha = pygame.surfarray.pixels_alpha(resultado)
-        mask  = alpha > 0
-
-        arr[:, :, 0][mask] = numpy.clip(
-            arr[:, :, 0][mask] * (1 - intensidad) + r * intensidad, 0, 255
-        ).astype(numpy.uint8)
-        arr[:, :, 1][mask] = numpy.clip(
-            arr[:, :, 1][mask] * (1 - intensidad) + g * intensidad, 0, 255
-        ).astype(numpy.uint8)
-        arr[:, :, 2][mask] = numpy.clip(
-            arr[:, :, 2][mask] * (1 - intensidad) + b * intensidad, 0, 255
-        ).astype(numpy.uint8)
-        del arr, alpha
-        return resultado
 
     def _dibujar_barra_vida(self, interfaz):
         """Dibuja la barra de vida del boss en la parte superior de la pantalla."""

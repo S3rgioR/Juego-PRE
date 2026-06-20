@@ -13,6 +13,10 @@ import pygame
 class ParedBossView:
     """Pared sólida que bloquea el paso hasta que el boss es derrotado.
 
+    La imagen base se recibe inyectada (igual que Plataforma recibe su
+    tileset) en vez de cargarse con una ruta hardcodeada en el constructor;
+    aquí solo se escala al tamaño que pida el nivel.
+
     Attributes
     ----------
     shape : pygame.Rect
@@ -27,14 +31,11 @@ class ParedBossView:
 
     unidireccional = False
 
-    def __init__(self, x: int, y: int, ancho: int, alto: int):
+    def __init__(self, x: int, y: int, ancho: int, alto: int,
+                 imagen_base: pygame.Surface):
         self.shape  = pygame.Rect(x, y, ancho, alto)
         self.activa = True
-
-        img_raw = pygame.image.load(
-            "Assets/Enviorments/ParedBoss.png"
-        ).convert_alpha()
-        self.imagen = pygame.transform.scale(img_raw, (ancho, alto))
+        self.imagen = pygame.transform.scale(imagen_base, (ancho, alto))
 
     def draw(self, interfaz: pygame.Surface, camara) -> None:
         if self.activa:

@@ -15,7 +15,6 @@ import Constantes
 import Fuentes
 from MenuConfig import MenuConfig
 
-from view.AudioManager import AudioManager
 
 # ── Paleta ──────────────────────────────────────────────────────────────────
 COLOR_FONDO_OVERLAY = (10, 10, 30, 200)   # capa semitransparente sobre el fondo
@@ -53,8 +52,12 @@ class MenuPrincipal:
     BTN_GAP    = 18       # separación entre botones
     BTN_RADIO  = 8        # redondeo de esquinas
 
-    def __init__(self, screen: pygame.Surface, tiene_save: bool = False, audio=None,
+    def __init__(self, screen, tiene_save=False, audio=None,
+             abrir_config=None,
                  fondo_path: str = "Assets/Enviorments/Fondo Pantalla de inicio/background.png",):
+
+        self._abrir_config = abrir_config or (lambda: MenuConfig(screen, audio).ejecutar())
+
         self.screen     = screen
         self.tiene_save = tiene_save
         self.seleccion  = 0   # índice del botón resaltado con teclado
@@ -101,8 +104,26 @@ class MenuPrincipal:
             return True
         return False
 
-    def _dibujar(self, hover_idx: int):
-        """Dibuja un frame completo del menú."""
+    def hover_idx(self, mouse_pos) -> int:
+        """Devuelve el índice del botón bajo el ratón, o -1.
+
+        Misma API que MenuPausa.hover_idx(): el caller (Presenter o el
+        propio ejecutar()) la consulta cada frame con pygame.mouse.get_pos(),
+        en vez de que el menú escuche MOUSEMOTION internamente.
+        """
+        for i, rect in enumerate(self._rects):
+            if rect.collidepoint(mouse_pos):
+                return i
+        return -1
+
+    def dibujar(self, hover_idx: int = -1):
+        """Dibuja un frame completo del menú sobre self.screen.
+
+        No llama a pygame.display.flip() — eso es responsabilidad de quien
+        controla el loop (main.py en ejecutar(), o el Presenter si este
+        menú se llegara a integrar como overlay). Misma convención que
+        MenuPausa.dibujar().
+        """
         # Fondo + overlay
         self.screen.blit(self._fondo, (0, 0))
         self.screen.blit(self._overlay, (0, 0))
@@ -173,69 +194,78 @@ class MenuPrincipal:
              Constantes.HEIGHT - 36)
         )
 
-        pygame.display.flip()
+    # ── Procesar eventos ────────────────────────────────────────────────────
 
-    # ── Loop del menú ────────────────────────────────────────────────────────
+    def procesar_evento(self, event) -> str | None:
+        """Procesa un evento pygame y devuelve la acción elegida o None.
+
+        Misma API que MenuPausa.procesar_evento(): no contiene loop ni
+        lee pygame.event.get() por sí mismo, así que puede ser pilotado
+        tanto por ejecutar() como por un Presenter externo si en el futuro
+        este menú se integra en el loop principal del juego.
+
+        Returns
+        -------
+        str or None
+            'jugar' | 'cargar' | 'salir', o None si el menú sigue abierto.
+            'config' se resuelve aquí mismo (abre y vuelve) y no se propaga.
+        """
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                return 'salir'
+
+            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                self.seleccion = (self.seleccion + 1) % len(self.OPCIONES)
+
+            elif event.key in (pygame.K_UP, pygame.K_w):
+                self.seleccion = (self.seleccion - 1) % len(self.OPCIONES)
+
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                accion = self.OPCIONES[self.seleccion][0]
+                if not self._esta_deshabilitado(accion):
+                    if accion == 'config':
+                        self._abrir_config()
+                    else:
+                        return accion
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for rect, (accion, _) in zip(self._rects, self.OPCIONES):
+                if rect.collidepoint(event.pos):
+                    if not self._esta_deshabilitado(accion):
+                        if accion == 'config':
+                            self._abrir_config()
+                        else:
+                            return accion
+
+        return None
+
+    # ── Loop de convenience (solo para el caso simple: main.py) ────────────
 
     def ejecutar(self) -> str:
         """Muestra el menú y bloquea hasta que el usuario elige una opción.
 
+        Wrapper delgado sobre procesar_evento()/dibujar()/hover_idx(): no
+        duplica lógica de eventos ni de dibujado, solo controla el reloj
+        y el flip(). Pensado para el caso simple de main.py, donde no hay
+        un Presenter todavía ejecutándose que pueda pilotar el menú.
+
         Returns
         -------
         str
-            Una de: 'jugar', 'cargar', 'config', 'salir'.
+            Una de: 'jugar', 'cargar', 'salir'.
         """
-        reloj     = pygame.time.Clock()
-        hover_idx = -1   # índice del botón bajo el ratón (-1 = ninguno)
-
+        reloj = pygame.time.Clock()
 
         while True:
             reloj.tick(60)
 
-            # ── Eventos ──
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return 'salir'
+                accion = self.procesar_evento(event)
+                if accion is not None:
+                    return accion
 
-                # Teclado
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        return 'salir'
-
-                    elif event.key in (pygame.K_DOWN, pygame.K_s):
-                        self.seleccion = (self.seleccion + 1) % len(self.OPCIONES)
-
-                    elif event.key in (pygame.K_UP, pygame.K_w):
-                        self.seleccion = (self.seleccion - 1) % len(self.OPCIONES)
-
-                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                        accion = self.OPCIONES[self.seleccion][0]
-                        if not self._esta_deshabilitado(accion):
-                            if accion == 'config':
-                                MenuConfig(self.screen, self._audio).ejecutar()  # abre y vuelve
-
-                            else:
-                                return accion
-
-                # Ratón: hover
-                elif event.type == pygame.MOUSEMOTION:
-                    hover_idx = -1
-                    for i, rect in enumerate(self._rects):
-                        if rect.collidepoint(event.pos):
-                            hover_idx = i
-                            break
-
-                # Ratón: clic
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    for i, (rect, (accion, _)) in enumerate(
-                        zip(self._rects, self.OPCIONES)
-                    ):
-                        if rect.collidepoint(event.pos):
-                            if not self._esta_deshabilitado(accion):
-                                if accion == 'config':
-                                    MenuConfig(self.screen, self._audio).ejecutar()
-                                else:
-                                    return accion
-
-            # ── Render ──
-            self._dibujar(hover_idx)
+            hover = self.hover_idx(pygame.mouse.get_pos())
+            self.dibujar(hover)
+            pygame.display.flip()

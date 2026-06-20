@@ -32,16 +32,14 @@ Nota sobre convert_alpha():
 """
 
 import pygame
-import numpy
 import Constantes
 import Fuentes
-from model.Enemigo2Model import Enemigo2Model
 
 from .Event              import Event
 from .Camara             import Camara
 from .Personaje          import PersonajeSprite
-from .Enemigo_1          import Enemigo1Sprite
-from .Enemigo_2          import Enemigo2Sprite
+from .Ogro          import OgroSprite
+from .Fantasma          import FantasmaSprite
 from .Plataforma         import Plataforma
 from .CheckpointView     import CheckpointView
 from .AngelView          import AngelView
@@ -53,8 +51,8 @@ from .BossSprite         import BossSprite
 from .BloodEffect        import BloodEffect
 from .ExplosionEffect    import ExplosionEffect
 from .HitEffect          import HitEffect
-from .PortalView import PortalView
-from .ParedBossView import ParedBossView
+from .PortalView         import PortalView
+from .ParedBossView      import ParedBossView
 from .PortalFinalView    import PortalFinalView
 from .FinDeJuegoSequence import FinDeJuegoSequence
 from .GameOverSequence   import GameOverSequence
@@ -118,7 +116,10 @@ class PygameView:
 
         # --- Checkpoint ---
         cx, cy = datos_checkpoint if datos_checkpoint else CHECKPOINT_NIVEL_1
-        self.sprite_checkpoint = CheckpointView(cx, cy)
+        img_checkpoint = pygame.image.load(
+            "Assets/Characters/statue.png"
+        ).convert_alpha()
+        self.sprite_checkpoint = CheckpointView(cx, cy, img_checkpoint)
 
         # --- HUD de vida (corazones) ---
         self._frames_vida_hud = self._cargar_frames_vida_hud()
@@ -148,6 +149,16 @@ class PygameView:
         # bordes de patrulla.
         self.sprites_plataformas_solidas = [
             p for p in self.sprites_plataformas if not p.unidireccional
+        ]
+
+        # Geometría pura (sin objetos Plataforma) de las plataformas sólidas,
+        # para pasar al Model en tick_ia(tiles_solidos=...). Las plataformas
+        # son estáticas tras cargar el nivel, así que esta caché se calcula
+        # una sola vez aquí: el Model nunca debe recibir ni tocar objetos de
+        # la Vista (ver EnemigoModel._hay_pared_entre).
+        self._bboxes_plataformas_solidas = [
+            (p.shape.left, p.shape.top, p.shape.right, p.shape.bottom)
+            for p in self.sprites_plataformas_solidas
         ]
 
         # --- Proyectiles de enemigos ---
@@ -236,27 +247,32 @@ class PygameView:
         # --- Pared del boss ---
         self.pared_boss = None
         if datos_pared_boss:
+            img_pared_boss = pygame.image.load(
+                "Assets/Enviorments/ParedBoss.png"
+            ).convert_alpha()
             self.pared_boss = ParedBossView(
                 datos_pared_boss['x'],
                 datos_pared_boss['y'],
                 datos_pared_boss['ancho'],
                 datos_pared_boss['alto'],
+                img_pared_boss,
             )
         self.sprites_enemigos = []
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
                 self.sprites_enemigos.append(
-                    Enemigo2Sprite(d['x'], d['y'], d['anim_walk'])
+                    FantasmaSprite(d['x'], d['y'], d['anim_walk'])
                 )
             else:
                 self.sprites_enemigos.append(
-                    Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
+                    OgroSprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
 
         for sprite in self.sprites_enemigos:
-            if isinstance(sprite, Enemigo2Sprite):
+            if isinstance(sprite, FantasmaSprite):
                 sprite.proyectil_frames = frames_proyectil
-        if audio:
-            Enemigo2Model.on_disparo = audio.sfx_ataque_enemigo2
+        # El sonido de disparo del enemigo volador se conecta en el Presenter
+        # vía modelo.evt_enemigo_disparo (fachada de JuegoModel), no aquí:
+        # la Vista no debe conocer ni modificar clases del Model.
 
         # --- Ángel curador ---
         if datos_angel:
@@ -447,30 +463,45 @@ class PygameView:
     # ------------------------------------------------------------------
 
     def actualizar_fisica(self, modelo, delta_time_ms):
-        """Mueve todos los objetos y notifica al Model sobre cada colisión.
+        """Mueve todos los objetos, detecta colisiones y reporta lo ocurrido.
 
-        Secuencia por objeto:
-        1. Aplicar gravedad (acumular velocidad_y desde el Model)
-        2. Mover horizontalmente → detectar colisiones → resolver
-        3. Mover verticalmente   → detectar colisiones → resolver
-        4. Notificar al Model (en_suelo / en_aire / golpe_techo)
-        5. Avanzar IA de enemigos y mover proyectiles
+        IMPORTANTE (MVP): este método ya NO decide ni ejecuta consecuencias
+        de combate ni IA. Se limita a:
+        1. Mover objetos y resolver colisiones contra el escenario.
+        2. Cachear posiciones (jugador/boss) para que el Model pueda usarlas
+           internamente (p.ej. para su propia IA en modelo.tick()).
+        3. Detectar solapamientos de combate y devolverlos como una lista
+           de eventos neutros — quien decide qué hacer con ellos (llamar a
+           modelo.golpe_*) es el Presenter, no la Vista.
 
         Parameters
         ----------
         modelo : JuegoModel
-            Model principal. Se consulta para leer velocidades y
-            se notifica al detectar colisiones.
         delta_time_ms : int
-            Milisegundos desde el último frame.
+
+        Returns
+        -------
+        list of tuple
+            Eventos de combate detectados este frame, p.ej.:
+            ('golpe_jugador_a_enemigo', i)
+            ('golpe_enemigo_a_jugador', None)
+            ('golpe_proyectil_a_jugador', proyectil)
+            ('golpe_jugador_a_proyectil', proyectil)
+            ('golpe_daga_jugador_a_enemigo', (i, proyectil))
+            ('golpe_daga_jugador_a_boss', proyectil)
+            ('golpe_proyectil_boss_a_jugador', proyectil)
+            ('golpe_boss_a_jugador', None)
+            ('golpe_jugador_a_boss', None)
         """
+        eventos = []
+
         self._mover_jugador(modelo, delta_time_ms)
         self._mover_enemigos(modelo, delta_time_ms)
         self._mover_proyectiles(modelo)
-        self._mover_dagas_jugador(modelo)      # ← proyectiles de daga
-        self._detectar_combate(modelo)
+        self._mover_dagas_jugador(modelo, eventos)     # ← proyectiles de daga
+        self._detectar_combate(modelo, eventos)
         self._detectar_corazones(modelo)
-        self._detectar_daga_pickup(modelo)     # ← recoger objeto daga
+        self._detectar_daga_pickup(modelo)              # ← recoger objeto daga
         self._ultimo_delta_ms = delta_time_ms  # ← lo usa la secuencia de fin de juego
 
         hitbox_espada = (self._calcular_hitbox_ataque_jugador(
@@ -480,14 +511,15 @@ class PygameView:
         if self.sprite_boss and modelo.boss and modelo.boss.vivo:
             modelo.boss._x = float(self.sprite_boss.shape.centerx)
             modelo.boss._y = float(self.sprite_boss.shape.centery)
-            modelo.jugador_pos_cache = self.sprite_jugador.shape.center
             pos_boss    = self.sprite_boss.shape.center
             pos_jugador = self.sprite_jugador.shape.center
             modelo.boss._last_jpos = pos_jugador
-            dx, dy, _ = modelo.boss.tick_ia(pos_boss, pos_jugador, delta_time_ms)
-            modelo.boss_delta = (dx, dy)
-            self.sprite_boss.shape.x += int(dx)
-            self.sprite_boss.shape.y += int(dy)
+
+            # La Vista solo aporta geometría: cachea las posiciones para que
+            # el Model decida y ejecute la IA del boss dentro de modelo.tick().
+            # La Vista ya NO llama a modelo.boss.tick_ia() directamente.
+            modelo.jugador_pos_cache = pos_jugador
+            modelo.boss_pos_cache    = pos_boss
 
             for p in modelo.boss.proyectiles:
                 if not p.vivo:
@@ -514,9 +546,7 @@ class PygameView:
                     p.vivo = False
                 # Impacta en el jugador
                 if p.vivo and p.shape.colliderect(self.sprite_jugador.shape):
-                    p.vivo = False
-                    modelo.golpe_proyectil_boss_a_jugador(p)
-                    self.audio.sfx_hurt_jugador()
+                    eventos.append(('golpe_proyectil_boss_a_jugador', p))
                 # Explosión solo si acaba de morir en este frame
                 if not p.vivo and self._frames_explosion:
                     self._efectos_explosion.append(
@@ -525,11 +555,11 @@ class PygameView:
 
             if modelo.boss.embestida_activa:
                 if self.sprite_boss.shape.colliderect(self.sprite_jugador.shape):
-                    modelo.golpe_boss_a_jugador()
+                    eventos.append(('golpe_boss_a_jugador', None))
 
             hitbox_espada2 = self.sprite_jugador.hitbox_ataque
             if hitbox_espada2 and hitbox_espada2.colliderect(self.sprite_boss.shape):
-                modelo.golpe_jugador_a_boss()
+                eventos.append(('golpe_jugador_a_boss', None))
             # Detectar muerte del boss en este frame
             if not modelo.boss.vivo and not self._boss_muerte_disparada:
                 self._disparar_efectos_muerte_boss()
@@ -555,10 +585,30 @@ class PygameView:
             cerca = self.portal_final.esta_cerca(self.sprite_jugador.shape)
             self.portal_final.set_mostrar_prompt(cerca, "[E] Fin del juego")
             self.portal_final.actualizar(delta_time_ms)
-    # --- Mover proyectiles de daga del jugador ---
 
-    def _mover_dagas_jugador(self, modelo):
-        """Mueve los proyectiles de daga del jugador y detecta colisiones."""
+        return eventos
+
+    def aplicar_movimiento_boss(self, modelo):
+        """Aplica al sprite del boss el desplazamiento decidido por el Model.
+
+        Se llama DESPUÉS de modelo.tick() (que es quien ahora ejecuta
+        boss.tick_ia() internamente y calcula modelo.boss_delta). La Vista
+        se limita a trasladar ese resultado a coordenadas de sprite —no
+        decide ni calcula la IA, solo la dibuja/posiciona.
+        """
+        if self.sprite_boss and modelo.boss and modelo.boss.vivo:
+            dx, dy = modelo.boss_delta
+            self.sprite_boss.shape.x += int(dx)
+            self.sprite_boss.shape.y += int(dy)
+
+
+    def _mover_dagas_jugador(self, modelo, eventos):
+        """Mueve los proyectiles de daga del jugador y detecta colisiones.
+
+        No llama al Model: añade los impactos detectados a `eventos`
+        (lista compartida con actualizar_fisica) para que el Presenter
+        decida qué hacer con ellos.
+        """
         for p in modelo.jugador.proyectiles_daga:
             if not p.vivo:
                 continue
@@ -581,7 +631,7 @@ class PygameView:
                         self._efectos_hit.append(
                             HitEffect(p.shape.centerx, p.shape.centery,
                                       self._frames_hit))
-                    modelo.golpe_daga_jugador_a_enemigo(i, p)
+                    eventos.append(('golpe_daga_jugador_a_enemigo', (i, p)))
                     break
 
             # Colisión con boss
@@ -592,9 +642,7 @@ class PygameView:
                     self._efectos_hit.append(
                         HitEffect(p.shape.centerx, p.shape.centery,
                                   self._frames_hit))
-                modelo.golpe_daga_jugador_a_boss(p)
-                if not modelo.boss.vivo and not self._boss_muerte_disparada:
-                    self._disparar_efectos_muerte_boss()
+                eventos.append(('golpe_daga_jugador_a_boss', p))
 
     # --- Recoger objeto daga del suelo ---
 
@@ -727,7 +775,6 @@ class PygameView:
     # --- Movimiento de enemigos ---
 
     def _mover_enemigos(self, modelo, delta_time_ms):
-        from model.Enemigo1Model import Enemigo1Model
         pos_jugador = self.sprite_jugador.shape.center
 
         for sprite, enemigo_m in zip(self.sprites_enemigos, modelo.enemigos):
@@ -736,11 +783,11 @@ class PygameView:
 
             pos_enemigo = sprite.shape.center
 
-            if isinstance(enemigo_m, Enemigo1Model):
+            if enemigo_m.usa_gravedad:
                 # Enemigo terrestre: gravedad + patrulla
                 # (las plataformas flotantes se ignoran: son solo para el jugador)
                 delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
-                                                tiles_solidos=self.sprites_plataformas_solidas)
+                                                tiles_solidos=self._bboxes_plataformas_solidas)
 
                 # Gravedad
                 enemigo_m.velocidad_y += Constantes.GRAVEDAD
@@ -788,7 +835,7 @@ class PygameView:
                 # Enemigo volador: solo patrulla horizontal, sin gravedad
                 # (las plataformas flotantes se ignoran: son solo para el jugador)
                 delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
-                                                tiles_solidos=self.sprites_plataformas_solidas)
+                                                tiles_solidos=self._bboxes_plataformas_solidas)
                 sprite.shape.x += delta_x
 
     # --- Movimiento de proyectiles ---
@@ -822,8 +869,13 @@ class PygameView:
 
     # --- Detección de combate ---
 
-    def _detectar_combate(self, modelo):
-        """Comprueba solapamientos de hitboxes y notifica al Model."""
+    def _detectar_combate(self, modelo, eventos):
+        """Comprueba solapamientos de hitboxes y los añade a `eventos`.
+
+        La Vista solo detecta geometría (qué hitboxes se solapan). Decidir
+        las consecuencias (daño, audio) es responsabilidad del Presenter,
+        que procesa la lista `eventos` tras llamar a este método.
+        """
         jugador_m     = modelo.jugador
         shape_jugador = self.sprite_jugador.shape
 
@@ -840,14 +892,12 @@ class PygameView:
 
             # Jugador golpea al enemigo
             if hitbox_jugador and hitbox_jugador.colliderect(sprite.shape):
-                modelo.golpe_jugador_a_enemigo(i)
+                eventos.append(('golpe_jugador_a_enemigo', i))
 
             # Enemigo golpea al jugador
             if (enemigo_m.hitbox_ataque
                     and enemigo_m.hitbox_ataque.colliderect(shape_jugador)):
-                modelo.golpe_enemigo_a_jugador()
-                self.audio.sfx_hurt_jugador()
-
+                eventos.append(('golpe_enemigo_a_jugador', None))
 
             # Proyectiles del enemigo
             if hasattr(enemigo_m, 'proyectiles'):
@@ -856,15 +906,14 @@ class PygameView:
                         continue
                     # Proyectil toca al jugador
                     if p.shape.colliderect(shape_jugador):
-                        modelo.golpe_proyectil_a_jugador(p)
-                        self.audio.sfx_hurt_jugador()
+                        eventos.append(('golpe_proyectil_a_jugador', p))
                     # Jugador destruye el proyectil con la espada
                     elif hitbox_jugador and hitbox_jugador.colliderect(p.shape):
                         if self._frames_explosion:
                             self._efectos_explosion.append(
                                 ExplosionEffect(p.shape.centerx, p.shape.centery,
                                                 self._frames_explosion))
-                        modelo.golpe_jugador_a_proyectil(p)
+                        eventos.append(('golpe_jugador_a_proyectil', p))
 
         # Actualizar hitbox de ataque en el Model para que la Vista la dibuje
         self.sprite_jugador._hitbox_ataque_cache = hitbox_jugador
@@ -935,6 +984,14 @@ class PygameView:
         for sprite, estado in zip(self.sprites_enemigos, estados_enemigos):
             sprite.sincronizar(estado)
             sprite.draw(self.screen, self.camara, estado)
+            # El aviso de detección (sonido + "!") respeta un cooldown
+            # propio del Sprite (ver EnemigoSpriteBase._sincronizar_base).
+            # Es la Vista quien decide aquí si reproducir el SFX, en vez
+            # de que el Model lo dispare directo al AudioManager — así el
+            # cooldown es puramente gráfico/de presentación y no afecta
+            # a la IA de persecución.
+            if self.audio and sprite.aviso_deteccion_listo:
+                self.audio.sfx_deteccion_enemigo()
 
         # Boss
         if self.sprite_boss and modelo is not None and modelo.boss and modelo.boss.vivo:
@@ -1064,18 +1121,18 @@ class PygameView:
         datos_boss : dict or None
             Datos del boss del nivel, o None si no hay boss.
         """
-        from .Enemigo_1 import Enemigo1Sprite
-        from .Enemigo_2 import Enemigo2Sprite
+        from .Ogro import OgroSprite
+        from .Fantasma import FantasmaSprite
 
         self.sprites_enemigos = []
         for d in datos_enemigos:
             if d.get('tipo') == 'volador':
-                sprite = Enemigo2Sprite(d['x'], d['y'], d['anim_walk'])
+                sprite = FantasmaSprite(d['x'], d['y'], d['anim_walk'])
                 sprite.proyectil_frames = getattr(self, '_frames_proyectil_cache', [])
                 self.sprites_enemigos.append(sprite)
             else:
                 self.sprites_enemigos.append(
-                    Enemigo1Sprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
+                    OgroSprite(d['x'], d['y'], d['anim_walk'], d['anim_attack']))
 
         # Limpiar proyectiles del boss si existe
         if self.sprite_boss and datos_boss:
