@@ -15,7 +15,6 @@ import Constantes
 import Fuentes
 from MenuConfig import MenuConfig
 
-from view.AudioManager import AudioManager
 
 # ── Paleta ──────────────────────────────────────────────────────────────────
 COLOR_FONDO_OVERLAY = (10, 10, 30, 200)   # capa semitransparente sobre el fondo
@@ -53,8 +52,12 @@ class MenuPrincipal:
     BTN_GAP    = 18       # separación entre botones
     BTN_RADIO  = 8        # redondeo de esquinas
 
-    def __init__(self, screen: pygame.Surface, tiene_save: bool = False, audio=None,
+    def __init__(self, screen, tiene_save=False, audio=None,
+             abrir_config=None,
                  fondo_path: str = "Assets/Enviorments/Fondo Pantalla de inicio/background.png",):
+
+        self._abrir_config = abrir_config or (lambda: MenuConfig(screen, audio).ejecutar())
+
         self.screen     = screen
         self.tiene_save = tiene_save
         self.seleccion  = 0   # índice del botón resaltado con teclado

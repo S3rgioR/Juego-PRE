@@ -18,6 +18,7 @@ from MenuPausa   import MenuPausa
 from model import BossModel
 from model.Enemigo1Model import Enemigo1Model
 from model.Enemigo2Model import Enemigo2Model
+from view import FinDeJuegoSequence
 
 from MenuConfig import MenuConfig
 
@@ -181,7 +182,6 @@ class JuegoPresenter:
             self._activar_fin_juego()
 
     def _activar_fin_juego(self):
-        from view.FinDeJuegoSequence import FinDeJuegoSequence
         self.vista._seq_fin_juego = FinDeJuegoSequence(self.vista.screen)
         self._seq_activa = True
 

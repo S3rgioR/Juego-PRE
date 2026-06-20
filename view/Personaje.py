@@ -8,7 +8,7 @@ para elegir la animación correcta.
 
 import pygame
 import Constantes
-import numpy
+from .VisualEffects import aplicar_tinte
 
 
 class PersonajeSprite:
@@ -149,14 +149,8 @@ class PersonajeSprite:
         img_rect = imagen_flip.get_rect(midbottom=self.shape.midbottom)
 
         if self._iframe_activo:
-            imagen_roja = imagen_flip.convert_alpha()
-            arr = pygame.surfarray.pixels3d(imagen_roja)
-            alpha = pygame.surfarray.pixels_alpha(imagen_roja)
-            mask = alpha > 0
-            arr[:, :, 0][mask] = numpy.minimum(255, arr[:, :, 0][mask].astype(int) + 150)
-            arr[:, :, 1][mask] = arr[:, :, 1][mask] // 3
-            arr[:, :, 2][mask] = arr[:, :, 2][mask] // 3
-            del arr, alpha
+            imagen_roja = aplicar_tinte(imagen_flip, r=255, g=0, b=0, intensidad=0.65)
+
             interfaz.blit(imagen_roja, camara.aplicar(img_rect))
         else:
             interfaz.blit(imagen_flip, camara.aplicar(img_rect))

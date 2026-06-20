@@ -9,7 +9,7 @@ from presenter     import JuegoPresenter
 from Nivel         import NIVELES
 from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
-from view.AudioManager import AudioManager
+from view import AudioManager
 from LevelParser import LevelParser
 def escalar_img(image, scale):
     w, h = image.get_width(), image.get_height()

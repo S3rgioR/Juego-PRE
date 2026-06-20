@@ -5,10 +5,10 @@ Reproduce una animación de 8 frames una sola vez
 en la posición del proyectil y desaparece al llegar al último frame.
 """
 
-import pygame
+from .OneShotEffect import OneShotEffect
 
 
-class ExplosionEffect:
+class ExplosionEffect(OneShotEffect):
     """Animación de explosión de un solo uso.
 
     Parameters
@@ -22,33 +22,4 @@ class ExplosionEffect:
     """
 
     def __init__(self, x: int, y: int, frames: list, cooldown_ms: int = 55):
-        self.frames      = frames
-        self.frame_index = 0
-        self.update_time = pygame.time.get_ticks()
-        self.cooldown_ms = cooldown_ms
-        self.terminado   = False
-
-        w = frames[0].get_width()
-        h = frames[0].get_height()
-        self.shape = pygame.Rect(0, 0, w, h)
-        self.shape.center = (x, y)
-
-    # ------------------------------------------------------------------ #
-
-    def update(self):
-        """Avanza el frame. Marca terminado al llegar al último."""
-        if self.terminado:
-            return
-        ahora = pygame.time.get_ticks()
-        if ahora - self.update_time >= self.cooldown_ms:
-            self.frame_index += 1
-            self.update_time  = ahora
-            if self.frame_index >= len(self.frames):
-                self.terminado = True
-
-    def draw(self, interfaz: pygame.Surface, camara) -> None:
-        """Dibuja el frame actual en pantalla."""
-        if self.terminado:
-            return
-        frame = self.frames[self.frame_index]
-        interfaz.blit(frame, camara.aplicar(self.shape))
+        super().__init__(x, y, frames, cooldown_ms)
