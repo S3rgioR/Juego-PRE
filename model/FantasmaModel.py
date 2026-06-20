@@ -1,12 +1,15 @@
 """Sub-modelo del Enemigo_2: patrullador volador con persecución y disparo."""
 
 import math
-import pygame
 from .EnemigoModel import EnemigoModel
 from .ProyectilModel import ProyectilModel
+from .Event import Event
 
 
-class Enemigo2Model(EnemigoModel):
+class FantasmaModel(EnemigoModel):
+    """Patrullador volador con persecución y disparo a distancia."""
+
+    usa_gravedad = False
     DISTANCIA_COMBATE = 200   # px — distancia que mantiene respecto al jugador
 
     def __init__(self, x, y, distancia_patrulla=150):
@@ -17,18 +20,38 @@ class Enemigo2Model(EnemigoModel):
         )
 
         self.cooldown_disparo = 1000
-        self.ultimo_disparo   = -2000
+        self._timer_disparo   = 0   # ms restantes hasta poder disparar de nuevo
         self.proyectiles      = []
 
         self.velocidad_persecucion = 2
 
+        # Notificación de disparo: el Presenter se suscribe vía JuegoModel
+        # (evt_enemigo_disparo), sin necesidad de importar Enemigo2Model
+        # directamente. Único canal de notificación de disparo.
+        self.evt_disparo = Event()
+
     # --- IA ---
 
     def tick_ia(self, pos_enemigo, pos_jugador, delta_time_ms, tiles_solidos=None):
+        """Ejecuta un tick de IA.
+
+        Parameters
+        ----------
+        pos_enemigo, pos_jugador : tuple of (float, float)
+            Centros en coordenadas de mundo.
+        delta_time_ms : int
+        tiles_solidos : list of tuple, optional
+            Bounding boxes puros (left, top, right, bottom) de los tiles
+            sólidos, usados solo para el raycast de _hay_pared_entre.
+            Nunca objetos de la Vista (p. ej. Plataforma).
+        """
         if not self.vivo:
             return 0, []
 
         self._iniciar_tick_ia(delta_time_ms)
+
+        if self._timer_disparo > 0:
+            self._timer_disparo = max(0, self._timer_disparo - delta_time_ms)
 
         ex, ey = pos_enemigo
         jx, jy = pos_jugador
@@ -77,19 +100,17 @@ class Enemigo2Model(EnemigoModel):
 
         # Disparar solo si persigue y tiene visión
         nuevos = []
-        ahora  = pygame.time.get_ticks()
-        if self.persiguiendo and (ahora - self.ultimo_disparo) >= self.cooldown_disparo:
+        if self.persiguiendo and self._timer_disparo <= 0:
             p = ProyectilModel(ex, ey, jx, jy)
             self.proyectiles.append(p)
             nuevos.append(p)
-            self.ultimo_disparo = ahora
+            self._timer_disparo = self.cooldown_disparo
 
             p = ProyectilModel(ex, ey, jx, jy)
             self.proyectiles.append(p)
             nuevos.append(p)
 
-            if hasattr(self, 'on_disparo'):
-                self.on_disparo()
+            self.evt_disparo.emit()
 
         return delta_x, nuevos
 

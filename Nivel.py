@@ -135,7 +135,7 @@ DATOS_NIVEL_2 = {
 def cargar_nivel_2(tileset: pygame.Surface) -> list:
     return LevelParser(tileset).cargar('levels/nivel2.txt')
 DATOS_NIVEL_3 = {
-    'spawn':      tp_abs(5, 15),          # posición de aparición del jugador
+    'spawn':      tp_abs(5, 25),          # posición de aparición del jugador
     'checkpoint': None,
     'musica':     'Assets/Audio/Music/Boss_Battle_Sequence.wav',
 

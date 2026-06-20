@@ -6,12 +6,21 @@ from .VisualEffects import aplicar_tinte
 
 
 class CheckpointView(InteractableView):
+    """Estatua de checkpoint.
+
+    La imagen se recibe inyectada desde quien construye la vista (igual que
+    PersonajeSprite recibe `frames` o Plataforma recibe `tileset`), en vez
+    de cargarse con una ruta hardcodeada dentro del constructor. Así la
+    carga de assets queda centralizada en un único sitio y esta clase no
+    necesita conocer rutas de disco.
+    """
+
     RADIO_ACTIVACION = 80
     DURACION_AZUL    = 1500   # ms que dura el efecto azul
     _COLOR_PROMPT    = (50, 50, 255)
 
-    def __init__(self, x: int, y: int):
-        self.image = pygame.image.load("Assets/Characters/statue.png").convert_alpha()
+    def __init__(self, x: int, y: int, imagen: pygame.Surface):
+        self.image = imagen
         super().__init__(
             x, y,
             self.image.get_width(),

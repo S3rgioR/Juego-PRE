@@ -2,7 +2,9 @@
 
 Unifica el comportamiento que ambos tipos de enemigo comparten:
   - Patrulla horizontal entre patrol_min/patrol_max (heredado de Actor).
-  - Detección de pared entre dos puntos (raycast por tiles sólidos).
+  - Detección de pared entre dos puntos (raycast por bounding boxes de
+    tiles sólidos, expresados como tuplas (left, top, right, bottom) —
+    el Model nunca recibe ni toca objetos de la Vista como Plataforma).
   - "Alerta por golpe": al recibir daño sin estar ya persiguiendo,
     se marca una bandera que el siguiente tick_ia debe consumir para
     girar hacia el atacante y empezar a perseguir.
@@ -14,8 +16,8 @@ tick_ia() con la IA específica (ataque cuerpo a cuerpo vs. disparo a
 distancia), reutilizando los helpers de aquí para la parte común.
 """
 
-import pygame
 from .Actor import Actor
+from .Event import Event
 
 
 class EnemigoModel(Actor):
@@ -31,7 +33,14 @@ class EnemigoModel(Actor):
         Distancia máxima a la que el enemigo puede detectar al jugador.
     persiguiendo : bool
         True mientras el enemigo está en modo persecución.
+    usa_gravedad : bool
+        True si el enemigo es terrestre (la Vista debe aplicarle gravedad
+        y colisión vertical con el suelo). False si es volador. Permite
+        que la Vista trate a cualquier enemigo de forma polimórfica, sin
+        necesidad de importar las subclases concretas para usar isinstance().
     """
+
+    usa_gravedad = True   # valor por defecto; las subclases lo sobreescriben
 
     def __init__(self, x, hp, iframe_duracion, distancia_patrulla,
                  velocidad, rango_vision):
@@ -48,6 +57,10 @@ class EnemigoModel(Actor):
         self.persiguiendo        = False   # True mientras sigue al jugador
         self._exclamacion_nueva  = False   # True solo el frame que detecta
         self._alertado_por_golpe = False   # True el frame en que recibe un golpe
+
+        # Notificación de detección: el Presenter se suscribe vía JuegoModel,
+        # sin necesidad de importar Enemigo1Model/Enemigo2Model directamente.
+        self.evt_deteccion = Event()
 
     # --- Combate ---
 
@@ -77,15 +90,26 @@ class EnemigoModel(Actor):
 
     def _iniciar_persecucion(self):
         """Activa el modo persecución y dispara la notificación de
-        detección (sonido) si la subclase la define."""
+        detección (sonido), si hay algún listener suscrito."""
         self.persiguiendo       = True
         self._exclamacion_nueva = True
-        if hasattr(self, 'on_deteccion'):
-            self.on_deteccion()
+        self.evt_deteccion.emit()
 
-    def _hay_pared_entre(self, pos_a, pos_b, tiles):
-        """Raycast simple por una lista de tiles sólidos entre dos puntos."""
-        if not tiles:
+    def _hay_pared_entre(self, pos_a, pos_b, tiles_bbox):
+        """Raycast simple por una lista de bounding boxes sólidos entre dos puntos.
+
+        Parameters
+        ----------
+        pos_a, pos_b : tuple of (float, float)
+            Puntos origen y destino del rayo, en coordenadas de mundo.
+        tiles_bbox : list of tuple, optional
+            Geometría pura de los tiles sólidos, cada uno como
+            (left, top, right, bottom). El Model nunca recibe objetos
+            de la Vista (p. ej. Plataforma) aquí, solo sus límites
+            numéricos — así no depende de pygame ni de ninguna clase
+            ajena a la capa de Model.
+        """
+        if not tiles_bbox:
             return False
         ax, ay = pos_a
         bx, by = pos_b
@@ -94,7 +118,7 @@ class EnemigoModel(Actor):
             t  = i / pasos
             px = int(ax + (bx - ax) * t)
             py = int(ay + (by - ay) * t)
-            for tile in tiles:
-                if tile.shape.collidepoint(px, py):
+            for left, top, right, bottom in tiles_bbox:
+                if left <= px < right and top <= py < bottom:
                     return True
         return False

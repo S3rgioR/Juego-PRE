@@ -18,6 +18,7 @@ import random
 import pygame
 import Constantes
 from model.Actor         import Actor
+from model.Event         import Event
 from model.ProyectilModel import ProyectilModel
 
 
@@ -76,8 +77,6 @@ class ProyectilBoss(ProyectilModel):
 
 class BossModel(Actor):
 
-    on_disparo = staticmethod(lambda: None)  # sobreescrito por el Presenter si hay audio
-
     HP_MAX = 16
 
     # Distancias / velocidades
@@ -124,6 +123,11 @@ class BossModel(Actor):
         self.fase        = 1
         self.proyectiles = []
 
+        # Notificación de disparo: el Presenter se suscribe vía JuegoModel,
+        # sin necesidad de importar BossModel directamente.
+        self.evt_disparo = Event()
+
+
         # --- Máquina de estados ---
         # Estados: 'acercarse' | 'descanso' | 'atacar_rayo' | 'atacar_x' |
         #          'atacar_tracking' | 'embestida_bajar' | 'embestida_cargar' |
@@ -133,9 +137,16 @@ class BossModel(Actor):
         # Temporizador genérico (descanso / pausa embestida)
         self._timer_estado = 0
 
+        # Reloj interno del Model, alimentado por delta_time_ms en tick_ia().
+        # Sustituye a pygame.time.get_ticks(): todas las comparaciones de
+        # cooldown son relativas (ahora - t_ultimo), así que un reloj propio
+        # que arranca en 0 es equivalente y mantiene el Model independiente
+        # del reloj de pygame.
+        self._reloj_ms = 0
+
         # Cooldowns individuales: inicializados en negativo para que el boss
         # pueda atacar en cuanto llegue al rango.
-        ahora = pygame.time.get_ticks()
+        ahora = self._reloj_ms
         self._t_rayo      = ahora - self.CD_RAYO
         self._t_x         = ahora - self.CD_X
         self._t_mas = ahora - self.CD_MAS
@@ -200,7 +211,7 @@ class BossModel(Actor):
         # Orientación
         self.flip = jx < self._x
 
-        ahora  = pygame.time.get_ticks()
+        ahora  = self._reloj_ms = self._reloj_ms + delta_time_ms
         nuevos = []
 
         # --- Avanzar ráfaga de rayo pendiente ---
@@ -390,20 +401,20 @@ class BossModel(Actor):
             self._rayo_pendiente = self.RAYO_NUM
             self._rayo_timer     = 0
             self._rayo_target    = (jx, jy)
-            self.on_disparo()
+            self.evt_disparo.emit()
 
         elif estado == 'atacar_x':
             nuevos = self._lanzar_x(self._x, self._y, jx, jy)
             self.proyectiles.extend(nuevos)
             # Transición inmediata a descanso (los proyectiles ya están creados)
             self._t_x = ahora
-            self.on_disparo()
+            self.evt_disparo.emit()
 
         elif estado == 'atacar_mas':
             nuevos = self._lanzar_mas(self._x, self._y, jx, jy)
             self.proyectiles.extend(nuevos)
             self._t_mas = ahora
-            self.on_disparo()
+            self.evt_disparo.emit()
 
         elif estado == 'atacar_tracking':
 

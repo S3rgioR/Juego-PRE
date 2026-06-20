@@ -15,9 +15,6 @@ Flujo por frame en ejecutar():
 
 from SaveManager import SaveManager
 from MenuPausa   import MenuPausa
-from model import BossModel
-from model.Enemigo1Model import Enemigo1Model
-from model.Enemigo2Model import Enemigo2Model
 from view import FinDeJuegoSequence
 
 from MenuConfig import MenuConfig
@@ -41,18 +38,23 @@ class JuegoPresenter:
                  datos_enemigos=None, datos_boss=None):
 
         self.vista      = vista
+        self.modelo     = modelo
         self.audio = audio
         if audio:
             self.vista.evt_saltar.add_listener(audio.sfx_salto)
             self.vista.evt_atacar.add_listener(audio.sfx_ataque_jugador)
-        if audio:
-            Enemigo1Model.on_ataque = audio.sfx_ataque_ogro
-        if audio:
-            BossModel.on_disparo = audio.sfx_ataque_boss
-        if audio:
-            Enemigo1Model.on_deteccion = audio.sfx_deteccion_enemigo
-            Enemigo2Model.on_deteccion = audio.sfx_deteccion_enemigo
-        self.modelo     = modelo
+            # Suscripción a los eventos de la fachada del Model: el Presenter
+            # no conoce Enemigo1Model/Enemigo2Model/BossModel directamente,
+            # solo JuegoModel (respeta MVP: único punto de acceso al Model).
+            self.modelo.evt_enemigo_ataque.add_listener(audio.sfx_ataque_ogro)
+            self.modelo.evt_enemigo_disparo.add_listener(audio.sfx_ataque_enemigo2)
+            self.modelo.evt_boss_disparo.add_listener(audio.sfx_ataque_boss)
+            # evt_enemigo_deteccion NO se conecta aquí: el aviso de
+            # detección (sonido + "!") tiene un cooldown de 2s por
+            # enemigo que es puramente gráfico/de presentación, así que
+            # es la Vista quien decide cuándo reproducirlo (ver
+            # PygameView.dibujar / sprite.aviso_deteccion_listo), no el
+            # Presenter conectando el evento del Model directo al audio.
         self.ejecutando = True
         self._num_frames_ataque_jugador = num_frames_ataque_jugador
         self.save_manager = SaveManager()
@@ -130,7 +132,7 @@ class JuegoPresenter:
                 self.vista.sprite_daga_pickup is not None
                 and self.vista.sprite_daga_pickup.recogida
         )
-        self.estado_jugador_al_retroceder['pos'] = list(self.vista.sprite_jugador.shape.center)
+        self.estado_jugador_al_retroceder['pos_retroceso'] = list(self.vista.sprite_jugador.shape.center)
         # Propagar el estado de niveles anteriores tal como llegó:
         # main.py lo usará para reconstruir la cadena completa al retroceder.
         if self._estado_jugador_previo is not None:
@@ -141,6 +143,23 @@ class JuegoPresenter:
     def _togglear_pausa(self):
         self._pausado = not self._pausado
         if self._pausado:
+            # Al pausar, el juego deja de recibir KEYUP de movimiento
+            # (la Vista no procesa input mientras _pausado, solo el menú
+            # de pausa lo hace). Si el jugador suelta A/D con el menú ya
+            # abierto, ese KEYUP se pierde y tanto la Vista
+            # (_dir_derecha/izquierda_pulsada) como el Model
+            # (mover_derecha/mover_izquierda) quedan "atascados" en
+            # movimiento, así que al reanudar el jugador sale disparado
+            # en esa dirección. Se fuerza aquí el mismo camino que un
+            # KEYUP real (eventos evt_mover_*_fin), que limpia el estado
+            # en ambos lados a la vez.
+            if self.vista._dir_derecha_pulsada:
+                self.vista.evt_mover_derecha_fin.emit()
+                self.vista._dir_derecha_pulsada = False
+            if self.vista._dir_izquierda_pulsada:
+                self.vista.evt_mover_izquierda_fin.emit()
+                self.vista._dir_izquierda_pulsada = False
+
             self._menu_pausa = MenuPausa(
                 screen     = self.vista.screen,
                 tiene_save = self.save_manager.existe())
@@ -316,11 +335,57 @@ class JuegoPresenter:
             self.vista.sprite_checkpoint.activar()
             # Activar pantalla de carga: congela el loop visible hasta que
             # la física haya resuelto la posición guardada correctamente.
-            self._cargando     = True
-            self._frames_carga = self._FRAMES_ESPERA
+            self.activar_pantalla_carga()
             print("[Presenter] ✓ Partida cargada")
         except Exception as e:
             print(f"[Presenter] ✗ Error al cargar: {e}")
+
+    def activar_pantalla_carga(self):
+        """Activa el overlay de "Cargando...": congela el loop visible
+        (bloquea inputs de juego) durante self._FRAMES_ESPERA frames,
+        mientras la física resuelve en silencio la posición del jugador.
+
+        Usado tanto al cargar una partida guardada como al entrar a un
+        nivel atravesando un portal (avance o retroceso), para que la
+        experiencia sea idéntica en ambos casos.
+        """
+        self._cargando     = True
+        self._frames_carga = self._FRAMES_ESPERA
+
+    # --- Despacho de eventos de combate (MVP: la Vista solo detecta) ---
+
+    def _procesar_eventos_combate(self, eventos):
+        """Traduce los eventos de colisión detectados por la Vista en
+        llamadas concretas al Model.
+
+        La Vista (en `actualizar_fisica`) solo informa de qué hitboxes se
+        solaparon; es el Presenter quien decide invocar al Model y disparar
+        los efectos de sonido asociados, manteniendo a la Vista ajena a las
+        reglas de negocio.
+        """
+        for tipo, dato in eventos:
+            if tipo == 'golpe_jugador_a_enemigo':
+                self.modelo.golpe_jugador_a_enemigo(dato)
+            elif tipo == 'golpe_enemigo_a_jugador':
+                self.modelo.golpe_enemigo_a_jugador()
+                if self.audio: self.audio.sfx_hurt_jugador()
+            elif tipo == 'golpe_proyectil_a_jugador':
+                self.modelo.golpe_proyectil_a_jugador(dato)
+                if self.audio: self.audio.sfx_hurt_jugador()
+            elif tipo == 'golpe_jugador_a_proyectil':
+                self.modelo.golpe_jugador_a_proyectil(dato)
+            elif tipo == 'golpe_daga_jugador_a_enemigo':
+                indice, proyectil = dato
+                self.modelo.golpe_daga_jugador_a_enemigo(indice, proyectil)
+            elif tipo == 'golpe_daga_jugador_a_boss':
+                self.modelo.golpe_daga_jugador_a_boss(dato)
+            elif tipo == 'golpe_proyectil_boss_a_jugador':
+                self.modelo.golpe_proyectil_boss_a_jugador(dato)
+                if self.audio: self.audio.sfx_hurt_jugador()
+            elif tipo == 'golpe_boss_a_jugador':
+                self.modelo.golpe_boss_a_jugador()
+            elif tipo == 'golpe_jugador_a_boss':
+                self.modelo.golpe_jugador_a_boss()
 
     # --- Game loop ---
 
@@ -359,8 +424,10 @@ class JuegoPresenter:
 
                 delta_time = self.vista.refrescar()
                 # Ejecutar física para que el jugador quede bien colocado
-                self.vista.actualizar_fisica(self.modelo, delta_time)
+                eventos = self.vista.actualizar_fisica(self.modelo, delta_time)
+                self._procesar_eventos_combate(eventos)
                 self.modelo.tick(delta_time)
+                self.vista.aplicar_movimiento_boss(self.modelo)
 
                 # Dibujar overlay negro con texto
                 self.vista.dibujar_pantalla_cargando()
@@ -388,11 +455,19 @@ class JuegoPresenter:
                 # 2. Delta time
                 delta_time = self.vista.refrescar()
 
-                # 3. Vista: mover objetos + detectar colisiones + notificar Model
-                self.vista.actualizar_fisica(self.modelo, delta_time)
+                # 3. Vista: mover objetos + detectar colisiones (solo geometría)
+                eventos = self.vista.actualizar_fisica(self.modelo, delta_time)
 
-                # 4. Model: avanzar contadores internos
+                # 3b. Presenter: decide qué hacer con cada colisión detectada
+                self._procesar_eventos_combate(eventos)
+
+                # 4. Model: avanzar contadores internos (incluye la IA del
+                #    boss, que ahora vive enteramente en el Model)
                 muertos = self.modelo.tick(delta_time)
+
+                # 4b. Vista: aplica al sprite el desplazamiento que el Model
+                #     decidió para el boss (la Vista no decide, solo dibuja)
+                self.vista.aplicar_movimiento_boss(self.modelo)
                 # muertos es lista de (indice, tipo) — el Model ya los eliminó
                 for i, tipo in reversed(muertos):
                     if self.audio:

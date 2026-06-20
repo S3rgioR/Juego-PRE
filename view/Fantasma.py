@@ -5,7 +5,7 @@ import math
 from .EnemigoSpriteBase import EnemigoSpriteBase
 
 
-class Enemigo2Sprite(EnemigoSpriteBase):
+class FantasmaSprite(EnemigoSpriteBase):
 
     def __init__(self, x, y, anim_walk):
         super().__init__(x, y, anim_walk)

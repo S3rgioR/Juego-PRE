@@ -16,6 +16,7 @@ class EnemigoSpriteBase:
     """
 
     EXCLAMACION_DURACION_MS = 800
+    COOLDOWN_AVISO_DETECCION_MS = 2000   # tiempo mínimo entre avisos (sonido + "!")
 
     # ------------------------------------------------------------------ #
     #  Inicialización                                                      #
@@ -43,6 +44,16 @@ class EnemigoSpriteBase:
         self._exclamacion_timer  = 0
         self._fuente_exclamacion = None   # lazy: se crea la primera vez que se dibuja
         self._last_draw_time     = pygame.time.get_ticks()
+
+        # Cooldown del aviso de detección (sonido + "!"). Es puramente
+        # gráfico/de presentación: el Model puede notificar detección
+        # con más frecuencia de la que queremos mostrar/sonar, así que
+        # la Vista decide aquí si ese aviso se "deja pasar" o se ignora.
+        self._cooldown_aviso_timer  = 0
+        self._cooldown_aviso_last   = pygame.time.get_ticks()
+        # True solo el frame en que sincronizar() decide que SÍ toca
+        # mostrar el aviso (la Vista lo consulta para disparar el SFX).
+        self.aviso_deteccion_listo  = False
 
     # ------------------------------------------------------------------ #
     #  Animación de frames                                                 #
@@ -72,8 +83,23 @@ class EnemigoSpriteBase:
         self.flip           = estado_modelo["flip"]
         self._iframe_activo = estado_modelo.get("iframe_activo", False)
 
+        # Cooldown del aviso (sonido + exclamación "!"): descuenta según
+        # tiempo real transcurrido, igual que _tick_exclamacion.
+        ahora = pygame.time.get_ticks()
+        delta = ahora - self._cooldown_aviso_last
+        self._cooldown_aviso_last = ahora
+        if self._cooldown_aviso_timer > 0:
+            self._cooldown_aviso_timer -= delta
+
+        self.aviso_deteccion_listo = False
         if estado_modelo.get("exclamacion_nueva"):
-            self._exclamacion_timer = self.EXCLAMACION_DURACION_MS
+            if self._cooldown_aviso_timer <= 0:
+                self._exclamacion_timer    = self.EXCLAMACION_DURACION_MS
+                self._cooldown_aviso_timer = self.COOLDOWN_AVISO_DETECCION_MS
+                self.aviso_deteccion_listo = True
+            # Si el cooldown sigue activo, se ignora este aviso por
+            # completo: ni se reinicia la exclamación visual ni se marca
+            # aviso_deteccion_listo, así la Vista tampoco reproduce el SFX.
 
     # ------------------------------------------------------------------ #
     #  Dibujado del sprite con tinte de iframe                             #

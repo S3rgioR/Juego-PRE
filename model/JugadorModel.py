@@ -4,7 +4,6 @@ Extiende Actor con el control de entrada del jugador: salto con
 coyote time, animación de ataque y lanzamiento de dagas.
 """
 
-import pygame
 import Constantes
 from .Actor import Actor
 
@@ -35,13 +34,19 @@ class JugadorModel(Actor):
         self.moviendose   = False
         self.coyote_timer = 0
 
+        # Reloj interno del Model, alimentado por delta_time_ms en tick().
+        # Sustituye a pygame.time.get_ticks(): el Model no debe depender
+        # del reloj de pygame para mantenerse independiente de la capa
+        # gráfica (testeable y desacoplado de los FPS reales).
+        self._reloj_ms = 0
+
         self._frame_index       = 0
-        self._update_time       = 0
+        self._anim_timer        = 0
         self._num_frames_ataque = 4
 
         # Habilidad daga
-        self.daga_desbloqueada  = False
-        self.proyectiles_daga   = []
+        self.daga_desbloqueada   = False
+        self.proyectiles_daga    = []
         self._ultimo_lanzamiento = -self.COOLDOWN_DAGA_MS   # listo desde el inicio
 
     # --- Acciones ---
@@ -51,7 +56,7 @@ class JugadorModel(Actor):
             self.atacando           = True
             self._frame_index       = 0
             self._num_frames_ataque = num_frames
-            self._update_time       = pygame.time.get_ticks()
+            self._anim_timer        = 0
 
     def saltar(self):
         if self.en_suelo or self.coyote_timer > 0:
@@ -93,8 +98,7 @@ class JugadorModel(Actor):
         if not self.daga_desbloqueada:
             return None
 
-        ahora = pygame.time.get_ticks()
-        if ahora - self._ultimo_lanzamiento < self.COOLDOWN_DAGA_MS:
+        if self._reloj_ms - self._ultimo_lanzamiento < self.COOLDOWN_DAGA_MS:
             return None
 
         # Importación local para evitar ciclo de imports
@@ -102,7 +106,7 @@ class JugadorModel(Actor):
 
         proyectil = DagaProyectilModel(pos_x, pos_y, flip, frame_ref)
         self.proyectiles_daga.append(proyectil)
-        self._ultimo_lanzamiento = ahora
+        self._ultimo_lanzamiento = self._reloj_ms
         return proyectil
 
     # --- Notificaciones de la Vista ---
@@ -120,12 +124,14 @@ class JugadorModel(Actor):
     # --- Tick interno ---
 
     def tick(self, delta_time_ms):
+        self._reloj_ms += delta_time_ms
         self._tick_iframes(delta_time_ms)
 
         if self.atacando:
-            if pygame.time.get_ticks() - self._update_time > self.COOLDOWN_ANIM:
+            self._anim_timer += delta_time_ms
+            if self._anim_timer > self.COOLDOWN_ANIM:
                 self._frame_index += 1
-                self._update_time  = pygame.time.get_ticks()
+                self._anim_timer   = 0
             if self._frame_index >= self._num_frames_ataque:
                 self.atacando     = False
                 self._frame_index = 0
@@ -153,7 +159,7 @@ class JugadorModel(Actor):
             'proyectiles_daga':   [p.obtener_estado()
                                    for p in self.proyectiles_daga],
             'cooldown_daga_listo': (
-                pygame.time.get_ticks() - self._ultimo_lanzamiento
+                self._reloj_ms - self._ultimo_lanzamiento
                 >= self.COOLDOWN_DAGA_MS
             ),
         }

@@ -4,7 +4,7 @@ import pygame
 from .EnemigoSpriteBase import EnemigoSpriteBase
 
 
-class Enemigo1Sprite(EnemigoSpriteBase):
+class OgroSprite(EnemigoSpriteBase):
 
     def __init__(self, x, y, anim_walk, anim_attack):
         super().__init__(x, y, anim_walk)
