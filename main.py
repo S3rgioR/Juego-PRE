@@ -83,6 +83,14 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         )
     datos_portal_regreso = datos_nivel.get('portal_regreso', None)
     datos_portal_final   = datos_nivel.get('portal_final', None)
+
+    # --- Pinchos (Spikes), parseados del .txt del nivel ---
+    tileset_spikes_tmp = pygame.image.load(
+        "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png"
+    ).convert_alpha()
+    datos_spikes = LevelParser(tileset_spikes_tmp).cargar_spikes(
+        f'levels/nivel{num_nivel}.txt'
+    )
     s = Constantes.SCALA_PERSONAJE
 
     # --- Dimensiones del personaje (antes de set_mode) ---
@@ -173,6 +181,7 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         datos_pared_boss      = datos_pared_boss,
         datos_portal_regreso  = datos_portal_regreso,
         datos_portal_final    = datos_portal_final,
+        datos_spikes          = datos_spikes,
 
     )
 

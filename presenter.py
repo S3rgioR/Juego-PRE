@@ -92,6 +92,7 @@ class JuegoPresenter:
         self.vista.evt_lanzar_daga.add_listener(self._lanzar_daga)
         self.vista.evt_nivel_anterior.add_listener(self._nivel_anterior)
         self.vista.evt_tecla_e.add_listener(self._usar_portal)
+        self.vista.evt_spikes_tocados.add_listener(self._spikes_tocados)
 
         self.num_nivel = num_nivel
         self.nivel_completado = False
@@ -114,6 +115,18 @@ class JuegoPresenter:
         # suficiente para que la física resuelva colisiones post-carga.
         self._frames_carga    = 0
         self._FRAMES_ESPERA   = 30
+
+        # --- Secuencia de pinchos (Spikes) ---
+        # fase: None | 'congelado' | 'negro'
+        #   'congelado' (500 ms): el juego se congela en el frame del golpe.
+        #   'negro'     (1000 ms): pantalla en negro; al terminar se
+        #                teletransporta al jugador a la última posición
+        #                guardada en una de las barreras de los pinchos.
+        self._spikes_fase         = None
+        self._spikes_timer_ms     = 0
+        self._spikes_respawn_pos  = None
+        self._SPIKES_MS_CONGELADO = 500
+        self._SPIKES_MS_NEGRO     = 1000
 
     # --- Handlers de eventos ---
     def _nivel_completado(self):
@@ -139,6 +152,41 @@ class JuegoPresenter:
             self.estado_jugador_al_retroceder['estado_niveles_anteriores'] = self._estado_jugador_previo
         self.nivel_anterior = True
         self.ejecutando = False
+
+    def _spikes_tocados(self, pos_respawn):
+        """El jugador ha tocado unos pinchos.
+
+        Aplica 1 corazón de daño (reutilizando la misma regla que un
+        golpe de enemigo) y arranca la secuencia: congelar 0.5s →
+        pantalla negra 1s → reaparecer en la última posición registrada
+        junto a los pinchos (la Vista la guarda al pasar por alguna de
+        las dos barreras invisibles adyacentes).
+
+        Si ya hay una secuencia de pinchos en curso, se ignora (evita
+        re-disparar mientras el jugador sigue solapando el hitbox).
+        """
+        if self._spikes_fase is not None:
+            return
+        self.modelo.golpe_enemigo_a_jugador()
+        if self.audio:
+            self.audio.sfx_hurt_jugador()
+
+        # Congelar TODO de golpe: si el jugador llevaba A/D pulsado, hay
+        # que cortar el movimiento en Vista y Model a la vez (mismo
+        # mecanismo que usa _togglear_pausa), o si no la velocidad
+        # horizontal queda "pegada" y, al reaparecer, el jugador sigue
+        # caminando indefinidamente en esa dirección sin que la tecla
+        # siga pulsada.
+        if self.vista._dir_derecha_pulsada:
+            self.vista.evt_mover_derecha_fin.emit()
+            self.vista._dir_derecha_pulsada = False
+        if self.vista._dir_izquierda_pulsada:
+            self.vista.evt_mover_izquierda_fin.emit()
+            self.vista._dir_izquierda_pulsada = False
+
+        self._spikes_respawn_pos = pos_respawn
+        self._spikes_fase        = 'congelado'
+        self._spikes_timer_ms    = self._SPIKES_MS_CONGELADO
 
     def _togglear_pausa(self):
         self._pausado = not self._pausado
@@ -407,6 +455,47 @@ class JuegoPresenter:
             if self._pausado:
                 self.vista.refrescar()   # limita FPS también en pausa
                 self._procesar_pausa(events)
+                continue
+
+            # --- Secuencia de pinchos (Spikes): congelado → negro → respawn ---
+            if self._spikes_fase is not None:
+                for event in events:
+                    if event.type == pygame.QUIT:
+                        self.ejecutando = False
+                        self.salida_forzada = True
+                        break
+
+                delta_time = self.vista.refrescar()
+                self._spikes_timer_ms -= delta_time
+
+                if self._spikes_fase == 'congelado':
+                    # Todo congelado: ni física del jugador, ni enemigos,
+                    # ni Model.tick(). Se repinta el mismo frame quieto.
+                    estado_jugador   = self.vista.obtener_estado_jugador(self.modelo)
+                    estados_enemigos = self.vista.obtener_estados_enemigos(self.modelo)
+                    self.vista.renderizar(estado_jugador, estados_enemigos, self.modelo)
+                    if self._spikes_timer_ms <= 0:
+                        # Al empezar la pantalla negra: teletransportar
+                        # YA al jugador a la posición guardada, para que
+                        # caiga con gravedad real sobre la plataforma
+                        # mientras la pantalla está negra (no al final).
+                        x, y = self._spikes_respawn_pos
+                        self.vista.restaurar_pos_jugador(int(x), int(y))
+                        self._spikes_fase     = 'negro'
+                        self._spikes_timer_ms = self._SPIKES_MS_NEGRO
+
+                elif self._spikes_fase == 'negro':
+                    # Pantalla negra: se retoma la gravedad SOLO del
+                    # jugador (cae y se asienta en la plataforma), sin
+                    # mover enemigos, sin IA, sin combate y sin leer
+                    # inputs de movimiento (siguen desactivados). El
+                    # control total (input + resto de entidades) se
+                    # retoma recién al salir de esta fase.
+                    self.vista.actualizar_gravedad_jugador(self.modelo, delta_time)
+                    self.vista.dibujar_pantalla_negra()
+                    if self._spikes_timer_ms <= 0:
+                        self._spikes_fase        = None
+                        self._spikes_respawn_pos = None
                 continue
 
             # --- Pantalla de carga post-restauración ---

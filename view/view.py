@@ -54,6 +54,7 @@ from .HitEffect          import HitEffect
 from .PortalView         import PortalView
 from .ParedBossView      import ParedBossView
 from .PortalFinalView    import PortalFinalView
+from .SpikesView         import SpikesView
 from .FinDeJuegoSequence import FinDeJuegoSequence
 from .GameOverSequence   import GameOverSequence
 
@@ -87,7 +88,8 @@ class PygameView:
                  datos_pared_boss=None,
                  datos_fin_nivel=None,
                  datos_portal_final=None,
-                 datos_portal_regreso=None):
+                 datos_portal_regreso=None,
+                 datos_spikes=None):
         """
         Parámetros nuevos
         -----------------
@@ -227,6 +229,18 @@ class PygameView:
                 datos_portal_regreso.get('alto', 1),
             )
 
+        # --- Pinchos (Spikes) ---
+        self.sprites_spikes = []
+        if datos_spikes:
+            img_spikes = pygame.image.load(
+                "Assets/Enviorments/Spikes.png"
+            ).convert_alpha()
+            for d in datos_spikes:
+                self.sprites_spikes.append(SpikesView(
+                    d['x'], d['y'], d['ancho'], d['alto'],
+                    img_spikes, d['barrera_izq'], d['barrera_der'],
+                ))
+
         # --- Sprites jugador y enemigos ---
         # Posición inicial: desde datos_spawn del nivel, o fallback al borde izquierdo.
         if datos_spawn:
@@ -314,6 +328,7 @@ class PygameView:
         self.evt_lanzar_daga            = Event()   # sin argumentos
         self.evt_nivel_anterior         = Event()
         self.evt_tecla_e                = Event()
+        self.evt_spikes_tocados         = Event()   # emite (x, y) de respawn
 
         self.audio = audio
 
@@ -502,6 +517,7 @@ class PygameView:
         self._detectar_combate(modelo, eventos)
         self._detectar_corazones(modelo)
         self._detectar_daga_pickup(modelo)              # ← recoger objeto daga
+        self._detectar_spikes(delta_time_ms)             # ← pinchos + barreras
         self._ultimo_delta_ms = delta_time_ms  # ← lo usa la secuencia de fin de juego
 
         hitbox_espada = (self._calcular_hitbox_ataque_jugador(
@@ -670,6 +686,23 @@ class PygameView:
                 corazon.recoger()
                 self.evt_corazon_recogido.emit(corazon.indice)
 
+    # --- Colisión con pinchos (Spikes) ---
+
+    def _detectar_spikes(self, delta_time_ms):
+        """Actualiza barreras sensoras y detecta toques de pinchos.
+
+        Solo detecta y reporta vía evt_spikes_tocados; no decide nada
+        sobre daño, congelado ni respawn — eso lo coordina el Presenter.
+        """
+        shape = self.sprite_jugador.shape
+        for sp in self.sprites_spikes:
+            sp.tick(delta_time_ms)
+            sp.actualizar_barreras(shape)
+            if sp.colisiona_con(shape):
+                sp.activar_cooldown()
+                pos = sp.pos_respawn or shape.center
+                self.evt_spikes_tocados.emit(pos)
+
     @property
     def fin_juego_activado(self) -> bool:
         return self._seq_fin_juego is not None
@@ -694,6 +727,18 @@ class PygameView:
                 self.portal_final.set_mostrar_prompt(False)
 
     # --- Movimiento del jugador ---
+
+    def actualizar_gravedad_jugador(self, modelo, delta_time_ms):
+        """Aplica solo el movimiento/gravedad del jugador, sin mover
+        enemigos, sin detectar colisiones de combate ni de pinchos.
+
+        Usado por el Presenter durante la fase de pantalla negra de la
+        secuencia de pinchos: el jugador, ya teletransportado a la
+        plataforma de respawn, debe caer con gravedad real sobre ella
+        mientras el resto del juego (enemigos, IA, combate) permanece
+        congelado y los inputs de movimiento siguen desactivados.
+        """
+        self._mover_jugador(modelo, delta_time_ms)
 
     def _mover_jugador(self, modelo, delta_time_ms):
         jugador_m = modelo.jugador
@@ -969,6 +1014,10 @@ class PygameView:
 
         if self.pared_boss and self.pared_boss.activa:
             self.pared_boss.draw(self.screen, self.camara)
+
+        # Pinchos
+        for sp in self.sprites_spikes:
+            sp.draw(self.screen, self.camara)
         # Checkpoint
         cerca_cp = self.sprite_checkpoint.esta_cerca(self.sprite_jugador.shape)
         self.sprite_checkpoint.set_mostrar_prompt(cerca_cp)
@@ -1453,6 +1502,17 @@ class PygameView:
         """Avanza el timer de la secuencia de Game Over si está activa."""
         if self._seq_game_over and not self._seq_game_over.terminado:
             self._seq_game_over.actualizar(delta_ms)
+
+    def dibujar_pantalla_negra(self):
+        """Pinta la pantalla completamente en negro, sin texto.
+
+        Usado por el Presenter durante la secuencia de respawn tras
+        tocar unos pinchos (Spikes): congelar 0.5s → pantalla negra 1s
+        → teletransportar al jugador → reanudar.
+        No llama a pygame.display.flip() — lo gestiona el presenter.
+        """
+        self.screen.fill((0, 0, 0))
+        pygame.display.flip()
 
     def dibujar_pantalla_cargando(self):
         """Pinta un overlay negro con 'Cargando...' centrado en pantalla.

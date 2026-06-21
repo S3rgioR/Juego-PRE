@@ -159,9 +159,10 @@ class LevelParser:
 
         sin_comentarios = ' '.join(linea.split('#')[0] for linea in lineas)
 
-        # Eliminar secciones con prefijo conocido (P.Boss:, etc.)
+        # Eliminar secciones con prefijo conocido (P.Boss:, Spikes:, etc.)
         # para que no se confundan con plataformas flotantes
         sin_comentarios = re.sub(r'P\.Boss\s*:\s*\[[^\]]*\]', '', sin_comentarios)
+        sin_comentarios = re.sub(r'Spikes\s*:\s*\[[^\]]*\]', '', sin_comentarios)
 
         secciones = []
         for bloque in re.findall(r'\[([^\]]*)\]', sin_comentarios):
@@ -373,6 +374,84 @@ class LevelParser:
         x = tx * tile
         y = Constantes.SUELO_Y - ty * tile - alto  # borde superior de la pared
         return {'x': x, 'y': y, 'ancho': ancho, 'alto': alto}
+
+    def cargar_spikes(self, ruta: str) -> list:
+        """Parsea TODOS los bloques `Spikes: [x y ancho]` de un archivo de nivel.
+
+        Formato
+        -------
+        Spikes: [ x  y  ancho ]
+
+          x     : columna de tile del extremo IZQUIERDO del conjunto de
+                  pinchos (igual convención que P.Boss: tiles desde el
+                  origen del nivel).
+          y     : fila de tile sobre el suelo (0 = pegado al suelo) en la
+                  que se apoya la base de los pinchos.
+          ancho : número de tiles que ocupa el conjunto hacia la derecha
+                  desde `x`. La altura es siempre 1 tile (16 px), el
+                  tamaño de Assets/Enviorments/Spikes.png.
+
+        Puede haber varios bloques `Spikes:` en el mismo archivo (varios
+        grupos de pinchos); se devuelven todos.
+
+        Cada elemento devuelto es un dict:
+            {
+                'x': int, 'y': int, 'ancho': int, 'alto': int,   # px
+                'barrera_izq': {'x','y','ancho','alto'},          # px
+                'barrera_der': {'x','y','ancho','alto'},          # px
+            }
+
+        Las "barreras" son zonas sensoras invisibles, adyacentes a cada
+        lado del conjunto de pinchos, de 20 tiles de alto. La Vista las
+        usa para recordar la última posición del jugador antes de caer
+        sobre los pinchos (ver view/SpikesView.py).
+        """
+        ruta_abs = os.path.join(os.path.dirname(os.path.abspath(__file__)), ruta)
+        with open(ruta_abs, 'r', encoding='utf-8') as f:
+            lineas = f.readlines()
+        contenido = ' '.join(linea.split('#')[0] for linea in lineas)
+
+        grupos = []
+        ALTO_BARRERA_TILES = 20
+
+        for bloque in re.findall(r'Spikes\s*:\s*\[([^\]]*)\]', contenido):
+            nums = [int(t) for t in bloque.split() if t]
+            if len(nums) != 3:
+                raise ValueError(
+                    f"[LevelParser] Spikes en '{ruta}' necesita exactamente 3 "
+                    f"números: [x y ancho], se encontraron {len(nums)}: {nums}"
+                )
+            tx, ty, ancho_tiles = nums
+
+            x     = tx * TILE_SIZE
+            ancho = ancho_tiles * TILE_SIZE
+            alto  = TILE_SIZE
+            y     = Constantes.SUELO_Y - ty * TILE_SIZE - alto
+
+            alto_barrera = ALTO_BARRERA_TILES * TILE_SIZE
+            y_barrera    = y - alto_barrera + alto
+
+            # Las barreras NO son adyacentes inmediatas a los pinchos:
+            # quedan un tile más hacia cada extremo (con un hueco de 1
+            # tile entre el borde de los pinchos y la barrera), para que
+            # el jugador las pise claramente antes de poder llegar a los
+            # pinchos desde cualquiera de los dos lados.
+            barrera_izq = {
+                'x': x - 2 * TILE_SIZE, 'y': y_barrera,
+                'ancho': TILE_SIZE, 'alto': alto_barrera,
+            }
+            barrera_der = {
+                'x': x + ancho + TILE_SIZE, 'y': y_barrera,
+                'ancho': TILE_SIZE, 'alto': alto_barrera,
+            }
+
+            grupos.append({
+                'x': x, 'y': y, 'ancho': ancho, 'alto': alto,
+                'barrera_izq': barrera_izq,
+                'barrera_der': barrera_der,
+            })
+
+        return grupos
 
     def _rangos_exterior(self, cortes, y_min, y_max):
         rangos = []

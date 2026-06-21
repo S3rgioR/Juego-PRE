@@ -31,7 +31,7 @@ DATOS_NIVEL_1 = {
         },
         {
             'tipo': 'terrestre',
-            **tp(70, 40),
+            **tp(55, 42),
             'distancia_patrulla': tiles_to_px(166),
             'num_frames_ataque': 6,
         },
@@ -53,6 +53,7 @@ DATOS_NIVEL_1 = {
 
     'corazones': [tp(32, 42)],
     'daga_pickup': None,
+    'spikes': [],  # se rellena en main.py parseando levels/nivel1.txt
 
     'fin_nivel': {
         **tp(110, 43),
@@ -123,6 +124,7 @@ DATOS_NIVEL_2 = {
     },
     'corazones': [tp(145, 38), tp(140, 21)],
     'daga_pickup': tp(10, 28),
+    'spikes': [],  # se rellena en main.py parseando levels/nivel2.txt
 
     'fin_nivel': {
         **tp(150, 21),
@@ -151,6 +153,7 @@ DATOS_NIVEL_3 = {
     },
     'corazones': None,
     'daga_pickup': None,
+    'spikes': [],  # se rellena en main.py parseando levels/nivel3.txt
     'portal_final': {
         **tp(125, 5),
         'ancho': 5,
