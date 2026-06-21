@@ -96,11 +96,13 @@ class MenuConfig:
             (self.PANEL_ANCHO, self.PANEL_ALTO), pygame.SRCALPHA
         )
 
-        # Volúmenes actuales
+        # Volúmenes actuales — se leen de los valores "crudos" del AudioManager
+        # (lo que el usuario puso en el slider), NO de volumen_musica/sfx que
+        # ya llevan la multiplicación por el volumen general aplicada.
         self._volumen = {
-            'general': (audio.volumen_musica + audio.volumen_sfx) / 2,
-            'musica':  audio.volumen_musica,
-            'sfx':     audio.volumen_sfx,
+            'general': getattr(audio, 'volumen_general_raw', 1.0),
+            'musica':  getattr(audio, 'volumen_musica_raw',  audio.volumen_musica),
+            'sfx':     getattr(audio, 'volumen_sfx_raw',     audio.volumen_sfx),
         }
 
         # Pantalla completa
@@ -284,9 +286,11 @@ class MenuConfig:
     # ── Audio ────────────────────────────────────────────────────────────────
 
     def _aplicar(self):
-        g = self._volumen['general']
-        self.audio.set_volumen_musica(self._volumen['musica'] * g)
-        self.audio.set_volumen_sfx(self._volumen['sfx'] * g)
+        self.audio.set_volumenes(
+            self._volumen['general'],
+            self._volumen['musica'],
+            self._volumen['sfx'],
+        )
 
     def _set_volumen(self, clave: str, valor: float):
         self._volumen[clave] = max(0.0, min(1.0, valor))
