@@ -2,15 +2,15 @@
   "hp": 5,
   "hp_max": 5,
   "pos": [
-    926,
-    -345
+    130,
+    631
   ],
   "camara": [
-    126.19186248568633,
-    -885.0146842502238
+    -550.5189965004689,
+    90.99999999999996
   ],
   "corazones_recogidos": [],
-  "num_nivel": 1,
+  "num_nivel": 2,
   "daga_desbloqueada": false,
   "boss_derrotado": true,
   "daga_recogida": false,
@@ -19,11 +19,10 @@
     "hp_max": 5,
     "daga_desbloqueada": false,
     "pos_retroceso": [
-      3266,
+      3326,
       -585
     ],
     "corazones_recogidos": [],
-    "daga_recogida": false,
-    "viene_de_retroceso": true
+    "daga_recogida": false
   }
 }
