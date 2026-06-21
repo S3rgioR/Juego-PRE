@@ -81,8 +81,8 @@ class JuegoModel:
 
     # --- Acciones del jugador ---
 
-    def jugador_saltar(self):               self.jugador.saltar()
-    def jugador_atacar(self, n):            self.jugador.iniciar_ataque(n)
+    def jugador_saltar(self):               return self.jugador.saltar()
+    def jugador_atacar(self, n):            return self.jugador.iniciar_ataque(n)
     def jugador_mover_derecha_inicio(self): self.mover_derecha   = True
     def jugador_mover_derecha_fin(self):    self.mover_derecha   = False
     def jugador_mover_izquierda_inicio(self): self.mover_izquierda = True

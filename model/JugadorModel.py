@@ -25,7 +25,8 @@ class JugadorModel(Actor):
     HP_MAX_BASE      = 5
     COYOTE_TIME      = 300    # ms
     COOLDOWN_ANIM    = 70     # ms entre frames de animación de ataque
-    COOLDOWN_DAGA_MS = 1500   # ms mínimos entre lanzamientos
+    COOLDOWN_DAGA_MS   = 1500   # ms mínimos entre lanzamientos
+    COOLDOWN_ATAQUE_MS = 500    # ms mínimos entre ataques
 
     def __init__(self):
         self.hp_max = self.HP_MAX_BASE
@@ -48,21 +49,37 @@ class JugadorModel(Actor):
         self.daga_desbloqueada   = False
         self.proyectiles_daga    = []
         self._ultimo_lanzamiento = -self.COOLDOWN_DAGA_MS   # listo desde el inicio
+        self._ultimo_ataque      = -self.COOLDOWN_ATAQUE_MS  # listo desde el inicio
 
     # --- Acciones ---
 
     def iniciar_ataque(self, num_frames):
-        if not self.atacando:
+        if not self.atacando and self._reloj_ms - self._ultimo_ataque >= self.COOLDOWN_ATAQUE_MS:
             self.atacando           = True
             self._frame_index       = 0
             self._num_frames_ataque = num_frames
             self._anim_timer        = 0
+            self._ultimo_ataque     = self._reloj_ms
+            return True
+        return False
 
     def saltar(self):
+        """Intenta saltar.
+
+        Returns
+        -------
+        bool
+            True si el salto se ha ejecutado realmente (estaba en el
+            suelo o dentro del coyote time). False si la pulsación no
+            ha tenido efecto (ya en el aire, fuera de coyote time) — en
+            ese caso no debe sonar el sfx de salto.
+        """
         if self.en_suelo or self.coyote_timer > 0:
             self.velocidad_y  = Constantes.FUERZA_SALTO
             self.en_suelo     = False
             self.coyote_timer = 0
+            return True
+        return False
 
     def curar_completo(self):
         self.hp   = self.hp_max

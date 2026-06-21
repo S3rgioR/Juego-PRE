@@ -14,7 +14,7 @@ class OgroModel(EnemigoModel):
 
     def __init__(self, x, y, distancia_patrulla=150, num_frames_ataque=6):
         super().__init__(
-            x, hp=5, iframe_duracion=600,
+            x, hp=5, iframe_duracion=800,
             distancia_patrulla=distancia_patrulla,
             velocidad=2, rango_vision=250,
         )

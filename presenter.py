@@ -41,8 +41,8 @@ class JuegoPresenter:
         self.modelo     = modelo
         self.audio = audio
         if audio:
-            self.vista.evt_saltar.add_listener(audio.sfx_salto)
-            self.vista.evt_atacar.add_listener(audio.sfx_ataque_jugador)
+            pass  # sfx_salto y sfx_ataque_jugador se reproducen condicionalmente
+                  # desde _saltar()/_atacar(), respetando coyote time y cooldown
             # Suscripción a los eventos de la fachada del Model: el Presenter
             # no conoce Enemigo1Model/Enemigo2Model/BossModel directamente,
             # solo JuegoModel (respeta MVP: único punto de acceso al Model).
@@ -252,8 +252,24 @@ class JuegoPresenter:
         self.vista._seq_fin_juego = FinDeJuegoSequence(self.vista.screen)
         self._seq_activa = True
 
-    def _saltar(self):  self.modelo.jugador_saltar()
-    def _atacar(self):  self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
+    def _saltar(self):
+        """Pide al Model que intente saltar y solo reproduce el sfx si
+        el salto se ha ejecutado realmente (en suelo o dentro del coyote
+        time). Si el jugador ya está en el aire fuera de ese margen, la
+        pulsación no tiene efecto y no debe sonar nada.
+        """
+        salto_real = self.modelo.jugador_saltar()
+        if salto_real and self.audio:
+            self.audio.sfx_salto()
+    def _atacar(self):
+        """Pide al Model que inicie el ataque y solo reproduce el sfx si
+        se ha ejecutado realmente (respeta COOLDOWN_ATAQUE_MS). Si el
+        jugador ya está atacando o el cooldown no ha pasado, la
+        pulsación no tiene efecto y no debe sonar nada.
+        """
+        ataque_real = self.modelo.jugador_atacar(self._num_frames_ataque_jugador)
+        if ataque_real and self.audio:
+            self.audio.sfx_ataque_jugador()
 
     def _curar_jugador(self):
         self.modelo.curar_jugador()
