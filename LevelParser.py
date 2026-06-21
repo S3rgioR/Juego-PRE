@@ -84,7 +84,7 @@ import re
 import pygame
 import Constantes
 from view.Plataforma import Plataforma, PlataformaFlotante
-
+from Import import obtener_ruta
 
 TILE_SIZE = 16
 
@@ -120,8 +120,14 @@ GROSOR_TECHO = TILE_SIZE
 
 class LevelParser:
 
+    _imagen_jugador = None  # se carga la primera vez que se instancia la clase
+
     def __init__(self, tileset: pygame.Surface):
         self.tileset = tileset
+        if LevelParser._imagen_jugador is None:
+            LevelParser._imagen_jugador = pygame.image.load(
+                obtener_ruta("Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png")
+            )
 
     # -----------------------------------------------------------------------
     # API publica
@@ -153,8 +159,7 @@ class LevelParser:
         con '#' se descartan línea a línea antes de buscar los corchetes, así
         que pueden usarse libremente dentro o fuera de un bloque.
         """
-        ruta_abs = os.path.join(os.path.dirname(os.path.abspath(__file__)), ruta)
-        with open(ruta_abs, 'r', encoding='utf-8') as f:
+        with open(ruta, 'r', encoding='utf-8') as f:
             lineas = f.readlines()
 
         sin_comentarios = ' '.join(linea.split('#')[0] for linea in lineas)

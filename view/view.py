@@ -60,6 +60,9 @@ from .SpikesView         import SpikesView
 from .FinDeJuegoSequence import FinDeJuegoSequence
 from .GameOverSequence   import GameOverSequence
 
+from Import import obtener_ruta
+
+
 class PygameView:
     """Gestiona fisica, entrada, camara, sprites y renderizado del juego.
 
@@ -120,8 +123,8 @@ class PygameView:
 
         # --- Checkpoint ---
         cx, cy = datos_checkpoint if datos_checkpoint else CHECKPOINT_NIVEL_1
-        img_checkpoint = pygame.image.load(
-            "Assets/Characters/statue.png"
+        img_checkpoint = pygame.image.load(obtener_ruta(
+            "Assets/Characters/statue.png")
         ).convert_alpha()
         self.sprite_checkpoint = CheckpointView(cx, cy, img_checkpoint)
 
@@ -130,21 +133,21 @@ class PygameView:
         # --- HUD de inventario (slot + icono de daga) ---
         self._frames_inventario_hud = self._cargar_frames_inventario_hud()
         # --- Fondos ---
-        fondo_raw = pygame.image.load(
-            "Assets/Enviorments/caverns-files-web/layers/background.png"
+        fondo_raw = pygame.image.load(obtener_ruta(
+            "Assets/Enviorments/caverns-files-web/layers/background.png")
         ).convert()
         self.fondo = pygame.transform.scale(fondo_raw, (Constantes.WIDTH, Constantes.HEIGHT))
 
-        fondo_walls_raw = pygame.image.load(
-            "Assets/Enviorments/caverns-files-web/layers/back-walls.png"
+        fondo_walls_raw = pygame.image.load(obtener_ruta(
+            "Assets/Enviorments/caverns-files-web/layers/back-walls.png")
         ).convert_alpha()
         self.fondo_walls = pygame.transform.scale(
             fondo_walls_raw, (Constantes.WIDTH, Constantes.HEIGHT)
         )
 
         # --- Tileset + plataformas ---
-        tileset = pygame.image.load(
-            "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png"
+        tileset = pygame.image.load(obtener_ruta(
+            "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png")
         ).convert_alpha()
         self.sprites_plataformas = nivel_loader(tileset)
 
@@ -170,7 +173,7 @@ class PygameView:
         frames_proyectil = []
         for i in range(1, 3):
             img = pygame.image.load(
-                f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png"
+                obtener_ruta(f"Assets/Characters/EnemyProjectile/Sprites/frame{i}.png")
             ).convert_alpha()
             frames_proyectil.append(pygame.transform.scale(
                 img, (int(img.get_width() * escala_proj),
@@ -182,7 +185,7 @@ class PygameView:
         self._frames_portal = []
 
         for i in range(1, 65):
-            img = pygame.image.load(f"Assets/Efectos/Portal/portal_9/portal{i}.png").convert_alpha()
+            img = pygame.image.load(obtener_ruta(f"Assets/Efectos/Portal/portal_9/portal{i}.png")).convert_alpha()
             w, h = img.get_width(), img.get_height()
             escala = Constantes.SCALA_PERSONAJE * 0.25
             img = pygame.transform.scale(img, (int(w * escala), int(h * escala)))
@@ -193,7 +196,7 @@ class PygameView:
         ESCALA_PORTAL_FINAL = Constantes.SCALA_PERSONAJE * 0.5  # sube/baja este numero para cambiar el tamano
         for i in range(1, 8):
             img = pygame.image.load(
-                f"Assets/Efectos/Portal Final juego/Frames/portal1_frame_{i}.png"
+                obtener_ruta(f"Assets/Efectos/Portal Final juego/Frames/portal1_frame_{i}.png")
             ).convert_alpha()
             w, h = img.get_width(), img.get_height()
             img = pygame.transform.scale(
@@ -235,7 +238,7 @@ class PygameView:
         self.sprites_spikes = []
         if datos_spikes:
             img_spikes = pygame.image.load(
-                "Assets/Enviorments/Spikes.png"
+                obtener_ruta("Assets/Enviorments/Spikes.png")
             ).convert_alpha()
             for d in datos_spikes:
                 self.sprites_spikes.append(SpikesView(
@@ -264,7 +267,7 @@ class PygameView:
         self.pared_boss = None
         if datos_pared_boss:
             img_pared_boss = pygame.image.load(
-                "Assets/Enviorments/ParedBoss.png"
+                obtener_ruta("Assets/Enviorments/ParedBoss.png")
             ).convert_alpha()
             self.pared_boss = ParedBossView(
                 datos_pared_boss['x'],
@@ -408,6 +411,11 @@ class PygameView:
         for c in self.sprites_corazones:
             if c.indice in indices:
                 c.recogido = True
+
+    def resetear_corazones(self):
+        """Hace visibles todos los corazones (para restaurar al estado del save)."""
+        for c in self.sprites_corazones:
+            c.recogido = False
 
     def indices_corazones_recogidos(self):
         return [c.indice for c in self.sprites_corazones if c.recogido]
@@ -1262,7 +1270,7 @@ class PygameView:
             s = Constantes.SCALA_PERSONAJE
             for i in range(1, 22):
                 img = pygame.image.load(
-                    f"Assets/Efectos/Blood/1_{i}.png"
+                    obtener_ruta(f"Assets/Efectos/Blood/1_{i}.png")
                 ).convert_alpha()
                 img = pygame.transform.scale(
                     img,
@@ -1283,7 +1291,7 @@ class PygameView:
             s = Constantes.SCALA_PERSONAJE
             for i in range(1, 9):
                 img = pygame.image.load(
-                    f"Assets/Efectos/explosion-1-f/Sprites/explosion-f{i}.png"
+                    obtener_ruta(f"Assets/Efectos/explosion-1-f/Sprites/explosion-f{i}.png")
                 ).convert_alpha()
                 img = pygame.transform.scale(
                     img,
@@ -1343,7 +1351,7 @@ class PygameView:
             s = Constantes.SCALA_PERSONAJE
             for i in range(1, 4):
                 img = pygame.image.load(
-                    f"Assets/Efectos/Hit/Sprites/hit{i}.png"
+                    obtener_ruta(f"Assets/Efectos/Hit/Sprites/hit{i}.png")
                 ).convert_alpha()
                 img = pygame.transform.scale(
                     img,
@@ -1386,7 +1394,7 @@ class PygameView:
             for carpeta in carpetas_candidatas:
                 ruta = carpeta + nombre
                 try:
-                    surface = pygame.image.load(ruta).convert_alpha()
+                    surface = pygame.image.load(obtener_ruta(ruta)).convert_alpha()
                     if carpeta != carpetas_candidatas[0]:
                         print(f"[HUD] AVISO '{carpetas_candidatas[0] + nombre}' no encontrada; "
                               f"usando '{ruta}' en su lugar.")
@@ -1433,7 +1441,7 @@ class PygameView:
             ]
             for r in candidatas:
                 try:
-                    surface = pygame.image.load(r).convert_alpha()
+                    surface = pygame.image.load(obtener_ruta(r)).convert_alpha()
                     break
                 except Exception:
                     continue

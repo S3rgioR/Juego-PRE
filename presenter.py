@@ -239,9 +239,10 @@ class JuegoPresenter:
                 self.modelo.jugador.velocidad_y = 0
             if 'camara' in datos:
                 self.vista.restaurar_camara(*datos['camara'])
+
+            self.vista.resetear_corazones()  # primero todos visibles
             if 'corazones_recogidos' in datos:
                 self.vista.restaurar_corazones_recogidos(set(datos['corazones_recogidos']))
-
             if datos.get('daga_recogida'):
                 self.vista.restaurar_daga_recogida()
                 self.modelo.jugador_desbloquear_daga()

@@ -14,6 +14,8 @@ import pygame
 import Constantes
 import Fuentes
 from MenuConfig import MenuConfig
+from Import import obtener_ruta
+
 
 
 # ── Paleta ──────────────────────────────────────────────────────────────────
@@ -54,7 +56,7 @@ class MenuPrincipal:
 
     def __init__(self, screen, tiene_save=False, audio=None,
              abrir_config=None,
-                 fondo_path: str = "Assets/Enviorments/Fondo Pantalla de inicio/background.png",):
+                 fondo_path: str = obtener_ruta("Assets/Enviorments/Fondo Pantalla de inicio/background.png"),):
 
         self._abrir_config = abrir_config or (lambda: MenuConfig(screen, audio).ejecutar())
 
