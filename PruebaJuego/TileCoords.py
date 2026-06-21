@@ -91,7 +91,7 @@ def tp(tx: float, ty: float) -> dict:
     >>> tp(10, 2)   # 2 tiles por encima del suelo
     {'x': 300, 'y': 596}
     """
-    tile = get_tile_size()
+    tile = 16
     px   = int(tx * tile)
     py   = int(Constantes.SUELO_Y - ty * tile)
     return {'x': px, 'y': py}

@@ -74,10 +74,24 @@ class SpikesView:
             self._cooldown_ms = max(0, self._cooldown_ms - delta_ms)
 
     def actualizar_barreras(self, shape_jugador):
-        """Si el jugador solapa alguna barrera, guarda su posición actual."""
-        if (self.rect_barrera_izq.colliderect(shape_jugador)
-                or self.rect_barrera_der.colliderect(shape_jugador)):
-            self.pos_respawn = shape_jugador.center
+        """Si el jugador solapa alguna barrera, guarda su posición de respawn.
+
+        La posición guardada es SIEMPRE un tile antes del borde de los
+        pinchos, por el lado por el que el jugador entró (no encima de
+        los pinchos): si toca la barrera izquierda, un tile a la
+        izquierda del borde izquierdo de los pinchos; si toca la
+        derecha, un tile a la derecha del borde derecho. La X no depende
+        de la posición exacta del hitbox del jugador (evita la asimetría
+        que había al entrar por la izquierda o por la derecha). Solo se
+        conserva la Y del jugador en ese instante, la altura del "suelo"
+        desde el que venía antes de pasar sobre los pinchos.
+        """
+        if self.rect_barrera_izq.colliderect(shape_jugador):
+            x = self.shape.left - TILE_SIZE // 2
+            self.pos_respawn = (x, shape_jugador.centery)
+        elif self.rect_barrera_der.colliderect(shape_jugador):
+            x = self.shape.right + TILE_SIZE // 2
+            self.pos_respawn = (x, shape_jugador.centery)
 
     def colisiona_con(self, shape_jugador) -> bool:
         """True si el jugador toca los pinchos y no hay cooldown activo."""
