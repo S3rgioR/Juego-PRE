@@ -28,6 +28,11 @@ class CheckpointView(InteractableView):
             texto_prompt="[K] Guardar",
         )
 
+        # InteractableView centra el shape en (x, y) por defecto. Para el
+        # checkpoint queremos que (x, y) sea la BASE (pie) de la estatua,
+        # no su centro, así que recolocamos el shape usando midbottom.
+        self.shape.midbottom = (x, y)
+
         self._inicio_azul   = 0
         self._efecto_activo = False
 

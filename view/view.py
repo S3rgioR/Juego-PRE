@@ -1,22 +1,24 @@
-"""Capa View del patrón MVP - Física, entrada, visualización y eventos.
+"""Capa View del patron MVP - Fisica, entrada, visualizacion y eventos.
 
 Responsabilidades:
-- Inicializar pygame y la ventana gráfica
+- Inicializar pygame y la ventana grafica
 - Capturar entrada del usuario (teclado, cierre de ventana)
 - Mover todos los objetos del juego (jugador y enemigos)
 - Detectar colisiones entre objetos y notificar al Model
-- Actualizar la cámara
+- Actualizar la camara
 - Renderizar todos los sprites
 - Emitir eventos que el Presenter escucha
 
 Lo que NO hace la Vista:
-- Decidir qué ocurre cuando hay una colisión (responsabilidad del Model)
+- Decidir que ocurre cuando hay una colision (responsabilidad del Model)
 - Gestionar hp, iframes ni cooldowns (responsabilidad del Model)
 - Coordinar el flujo del juego (responsabilidad del Presenter)
+- Escribir atributos internos del Model (p.ej. boss._x, boss._y, boss.vivo):
+  toda comunicacion hacia el Model pasa por su API publica.
 
-Filosofía de esta arquitectura:
-    La Vista es el motor físico. Mueve los objetos, detecta solapamientos
-    y consulta al Model mediante llamadas explícitas:
+Filosofia de esta arquitectura:
+    La Vista es el motor fisico. Mueve los objetos, detecta solapamientos
+    y consulta al Model mediante llamadas explicitas:
         - modelo.golpe_jugador_a_enemigo(i)
         - modelo.golpe_enemigo_a_jugador()
         - modelo.golpe_proyectil_a_jugador(p)
@@ -27,8 +29,8 @@ Filosofía de esta arquitectura:
 
 Nota sobre convert_alpha():
     pygame.Surface.convert_alpha() requiere que pygame.display.set_mode()
-    ya haya sido llamado. Por eso el tileset y los fondos se cargan aquí,
-    dentro de __init__, después de crear la ventana.
+    ya haya sido llamado. Por eso el tileset y los fondos se cargan aqui,
+    dentro de __init__, despues de crear la ventana.
 """
 
 import pygame
@@ -59,7 +61,7 @@ from .FinDeJuegoSequence import FinDeJuegoSequence
 from .GameOverSequence   import GameOverSequence
 
 class PygameView:
-    """Gestiona física, entrada, cámara, sprites y renderizado del juego.
+    """Gestiona fisica, entrada, camara, sprites y renderizado del juego.
 
     Attributes
     ----------
@@ -70,13 +72,13 @@ class PygameView:
     camara : Camara
         Gestiona el desplazamiento de la vista.
     fondo, fondo_walls : pygame.Surface
-        Capas de fondo estáticas.
+        Capas de fondo estaticas.
     sprite_jugador : PersonajeSprite
-        Sprite visual y shape físico del jugador.
+        Sprite visual y shape fisico del jugador.
     sprites_enemigos : list
-        Sprites visuales y shapes físicos de los enemigos.
+        Sprites visuales y shapes fisicos de los enemigos.
     sprites_plataformas : list of Plataforma
-        Geometría y visualización del nivel.
+        Geometria y visualizacion del nivel.
     """
     def __init__(self, frames_jugador, datos_enemigos, nivel_loader, datos_boss, audio=None,
                  frames_angel=None, datos_angel=None,
@@ -91,7 +93,7 @@ class PygameView:
                  datos_portal_regreso=None,
                  datos_spikes=None):
         """
-        Parámetros nuevos
+        Parametros nuevos
         -----------------
         imagen_daga_pickup : pygame.Surface
             Imagen del objeto daga en el suelo (Assets/Characters/Daga.png).
@@ -101,16 +103,16 @@ class PygameView:
             Frames del proyectil daga (Assets/Characters/Dagger/dagger.png).
         """
         # pygame.init() y set_mode() ya fueron llamados en main.py
-        # No volver a llamarlos aquí: reinicializarían el mixer y matarían la música.
+        # No volver a llamarlos aqui: reinicializarian el mixer y matarian la musica.
         self.screen = pygame.display.get_surface()
 
         self.reloj  = pygame.time.Clock()
         self.camara = Camara()
 
-        # Teclas mantenidas: la cámara las usa para desplazarse hacia donde
+        # Teclas mantenidas: la camara las usa para desplazarse hacia donde
         # el jugador lleva rato mirando/caminando. A/D ya mueven al jugador;
-        # W/S no se usan para nada más en el gameplay, así que quedan libres
-        # para "mirar arriba/abajo" con la cámara.
+        # W/S no se usan para nada mas en el gameplay, asi que quedan libres
+        # para "mirar arriba/abajo" con la camara.
         self._dir_derecha_pulsada  = False
         self._dir_izquierda_pulsada = False
         self._mirar_arriba_pulsada  = False
@@ -153,10 +155,10 @@ class PygameView:
             p for p in self.sprites_plataformas if not p.unidireccional
         ]
 
-        # Geometría pura (sin objetos Plataforma) de las plataformas sólidas,
+        # Geometria pura (sin objetos Plataforma) de las plataformas solidas,
         # para pasar al Model en tick_ia(tiles_solidos=...). Las plataformas
-        # son estáticas tras cargar el nivel, así que esta caché se calcula
-        # una sola vez aquí: el Model nunca debe recibir ni tocar objetos de
+        # son estaticas tras cargar el nivel, asi que esta cache se calcula
+        # una sola vez aqui: el Model nunca debe recibir ni tocar objetos de
         # la Vista (ver EnemigoModel._hay_pared_entre).
         self._bboxes_plataformas_solidas = [
             (p.shape.left, p.shape.top, p.shape.right, p.shape.bottom)
@@ -188,7 +190,7 @@ class PygameView:
 
         # --- Portal final de juego (7 frames propios) ---
         self._frames_portal_final = []
-        ESCALA_PORTAL_FINAL = Constantes.SCALA_PERSONAJE * 0.5  # ← sube/baja este número para cambiar el tamaño
+        ESCALA_PORTAL_FINAL = Constantes.SCALA_PERSONAJE * 0.5  # sube/baja este numero para cambiar el tamano
         for i in range(1, 8):
             img = pygame.image.load(
                 f"Assets/Efectos/Portal Final juego/Frames/portal1_frame_{i}.png"
@@ -208,7 +210,7 @@ class PygameView:
                 datos_portal_final.get('ancho', 1),
                 datos_portal_final.get('alto', 1),
             )
-        # Portal de avance (fin de nivel) — siempre presente si datos_fin_nivel existe
+        # Portal de avance (fin de nivel) -- siempre presente si datos_fin_nivel existe
         self.portal_fin = None
         if datos_fin_nivel:
             self.portal_fin = PortalView(
@@ -242,7 +244,7 @@ class PygameView:
                 ))
 
         # --- Sprites jugador y enemigos ---
-        # Posición inicial: desde datos_spawn del nivel, o fallback al borde izquierdo.
+        # Posicion inicial: desde datos_spawn del nivel, o fallback al borde izquierdo.
         if datos_spawn:
             _x_inicio = datos_spawn[0]
             _y_inicio = datos_spawn[1]
@@ -285,10 +287,10 @@ class PygameView:
             if isinstance(sprite, FantasmaSprite):
                 sprite.proyectil_frames = frames_proyectil
         # El sonido de disparo del enemigo volador se conecta en el Presenter
-        # vía modelo.evt_enemigo_disparo (fachada de JuegoModel), no aquí:
+        # via modelo.evt_enemigo_disparo (fachada de JuegoModel), no aqui:
         # la Vista no debe conocer ni modificar clases del Model.
 
-        # --- Ángel curador ---
+        # --- Angel curador ---
         if datos_angel:
             self.sprite_angel = AngelView(datos_angel['x'], datos_angel['y'], frames_angel or [])
         else:
@@ -323,7 +325,7 @@ class PygameView:
         self.evt_cargar                 = Event()
         self.evt_pausa                  = Event()
         self.evt_curar                  = Event()
-        self.evt_corazon_recogido       = Event()   # emite el índice
+        self.evt_corazon_recogido       = Event()   # emite el indice
         self.evt_daga_recogida          = Event()   # sin argumentos
         self.evt_lanzar_daga            = Event()   # sin argumentos
         self.evt_nivel_anterior         = Event()
@@ -351,7 +353,7 @@ class PygameView:
         self._frames_blood = self._cargar_frames_blood()
         self._efectos_sangre: list = []
 
-        # --- Efecto de explosión (muerte de proyectiles enemigos) ---
+        # --- Efecto de explosion (muerte de proyectiles enemigos) ---
         self._frames_explosion = self._cargar_frames_explosion()
         self._efectos_explosion: list = []
 
@@ -376,19 +378,19 @@ class PygameView:
 
     @property
     def camara_pos(self):
-        """Devuelve la posición de la cámara como lista serializable."""
+        """Devuelve la posicion de la camara como lista serializable."""
         return [self.camara.x, self.camara.y]
 
     def restaurar_camara(self, cx, cy):
-        """Restaura la posición de la cámara al cargar una partida."""
+        """Restaura la posicion de la camara al cargar una partida."""
         self.camara.x = cx
         self.camara.y = cy
 
     def restaurar_pos_jugador(self, x, y):
-        """Restaura la posición física del sprite del jugador.
+        """Restaura la posicion fisica del sprite del jugador.
 
         En esta arquitectura las posiciones viven en la Vista,
-        por eso la restauración también debe hacerse aquí.
+        por eso la restauracion tambien debe hacerse aqui.
 
         Parameters
         ----------
@@ -397,8 +399,8 @@ class PygameView:
         """
         self.sprite_jugador.shape.center = (x, y)
         self.sprite_jugador._hitbox_ataque_cache = None
-        # Sincronizar el float interno _y con la nueva posición.
-        # Sin esto, la física parte del _y antiguo el frame siguiente
+        # Sincronizar el float interno _y con la nueva posicion.
+        # Sin esto, la fisica parte del _y antiguo el frame siguiente
         # y empuja al jugador de vuelta a donde estaba antes de cargar.
         self.sprite_jugador._y_override = float(self.sprite_jugador.shape.y)
 
@@ -454,12 +456,10 @@ class PygameView:
                 elif event.key == pygame.K_SPACE:
                     self.evt_saltar.emit()
                     # El sonido de salto se dispara desde el Presenter
-                    # NO llamar aquí para evitar doble disparo si el salto falla.
+                    # NO llamar aqui para evitar doble disparo si el salto falla.
                 elif event.key == pygame.K_e:
                     self.evt_tecla_e.emit()
-                    if (self.portal_final and self._seq_fin_juego is None
-                            and self.portal_final.esta_cerca(self.sprite_jugador.shape)):
-                        self.iniciar_fin_de_juego()
+
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_d:
@@ -474,20 +474,26 @@ class PygameView:
                     self._mirar_abajo_pulsada = False
 
     # ------------------------------------------------------------------
-    # Física
+    # Fisica
     # ------------------------------------------------------------------
 
     def actualizar_fisica(self, modelo, delta_time_ms):
         """Mueve todos los objetos, detecta colisiones y reporta lo ocurrido.
 
-        IMPORTANTE (MVP): este método ya NO decide ni ejecuta consecuencias
+        IMPORTANTE (MVP): este metodo ya NO decide ni ejecuta consecuencias
         de combate ni IA. Se limita a:
         1. Mover objetos y resolver colisiones contra el escenario.
         2. Cachear posiciones (jugador/boss) para que el Model pueda usarlas
            internamente (p.ej. para su propia IA en modelo.tick()).
         3. Detectar solapamientos de combate y devolverlos como una lista
-           de eventos neutros — quien decide qué hacer con ellos (llamar a
+           de eventos neutros -- quien decide que hacer con ellos (llamar a
            modelo.golpe_*) es el Presenter, no la Vista.
+
+        La Vista nunca escribe atributos internos del Model (p.ej.
+        `modelo.boss._x`): toda comunicacion de geometria hacia el Model
+        pasa por sus caches publicas (`jugador_pos_cache`, `boss_pos_cache`),
+        que el propio Model consume a traves de su API publica
+        (`boss.sincronizar_posicion(...)`) en su `tick()`.
 
         Parameters
         ----------
@@ -513,40 +519,38 @@ class PygameView:
         self._mover_jugador(modelo, delta_time_ms)
         self._mover_enemigos(modelo, delta_time_ms)
         self._mover_proyectiles(modelo)
-        self._mover_dagas_jugador(modelo, eventos)     # ← proyectiles de daga
+        self._mover_dagas_jugador(modelo, eventos)     # proyectiles de daga
         self._detectar_combate(modelo, eventos)
         self._detectar_corazones(modelo)
-        self._detectar_daga_pickup(modelo)              # ← recoger objeto daga
-        self._detectar_spikes(delta_time_ms)             # ← pinchos + barreras
-        self._ultimo_delta_ms = delta_time_ms  # ← lo usa la secuencia de fin de juego
+        self._detectar_daga_pickup(modelo)              # recoger objeto daga
+        self._detectar_spikes(delta_time_ms)             # pinchos + barreras
+        self._ultimo_delta_ms = delta_time_ms  # lo usa la secuencia de fin de juego
 
         hitbox_espada = (self._calcular_hitbox_ataque_jugador(
             self.sprite_jugador.shape, modelo.jugador.flip)
             if modelo.jugador.atacando else None)
 
         # Detectar muerte del boss en este frame. Se comprueba ANTES del
-        # `if ... modelo.boss.vivo:` de abajo y sin depender de él: el
-        # daño que mata al boss se aplica en el Presenter (tras procesar
-        # los `eventos` que devuelve este mismo método), así que el
-        # primer frame en que `modelo.boss.vivo` es False ya es el
-        # siguiente a actualizar_fisica() — y si esta comprobación
-        # viviera dentro del bloque `if modelo.boss.vivo:`, jamás podría
-        # cumplirse (la condición exterior ya la habría descartado).
-        if self.sprite_boss and modelo.boss and not modelo.boss.vivo and not self._boss_muerte_disparada:
+        # `if ... modelo.boss_vivo():` de abajo y sin depender de el: el
+        # dano que mata al boss se aplica en el Presenter (tras procesar
+        # los `eventos` que devuelve este mismo metodo), asi que el
+        # primer frame en que `modelo.boss_vivo()` es False ya es el
+        # siguiente a actualizar_fisica() -- y si esta comprobacion
+        # viviera dentro del bloque `if modelo.boss_vivo():`, jamas podria
+        # cumplirse (la condicion exterior ya la habria descartado).
+        if self.sprite_boss and modelo.boss and not modelo.boss_vivo() and not self._boss_muerte_disparada:
             self._disparar_efectos_muerte_boss()
             if self.pared_boss:
                 self.pared_boss.activa = False
 
-        if self.sprite_boss and modelo.boss and modelo.boss.vivo:
-            modelo.boss._x = float(self.sprite_boss.shape.centerx)
-            modelo.boss._y = float(self.sprite_boss.shape.centery)
+        if self.sprite_boss and modelo.boss_vivo():
             pos_boss    = self.sprite_boss.shape.center
             pos_jugador = self.sprite_jugador.shape.center
-            modelo.boss._last_jpos = pos_jugador
 
-            # La Vista solo aporta geometría: cachea las posiciones para que
+            # La Vista solo aporta geometria: cachea las posiciones para que
             # el Model decida y ejecute la IA del boss dentro de modelo.tick().
-            # La Vista ya NO llama a modelo.boss.tick_ia() directamente.
+            # La Vista ya NO llama a modelo.boss.tick_ia() directamente, ni
+            # escribe modelo.boss._x / modelo.boss._y / modelo.boss._last_jpos.
             modelo.jugador_pos_cache = pos_jugador
             modelo.boss_pos_cache    = pos_boss
 
@@ -556,12 +560,12 @@ class PygameView:
                 p._x += p.vel_x
                 p._y += p.vel_y
                 p.shape.center = (int(p._x), int(p._y))
-                # Fuera de mapa: desaparecer sin explosión
+                # Fuera de mapa: desaparecer sin explosion
                 if (p.shape.right < -2000 or p.shape.left > 8000
                         or p.shape.bottom < -1000 or p.shape.top > 1500):
                     p.vivo = False
                     continue
-                # Colisión con plataforma
+                # Colision con plataforma
                 for plat in self.sprites_plataformas:
                     if p.shape.colliderect(plat.shape):
                         p.vivo = False
@@ -576,7 +580,7 @@ class PygameView:
                 # Impacta en el jugador
                 if p.vivo and p.shape.colliderect(self.sprite_jugador.shape):
                     eventos.append(('golpe_proyectil_boss_a_jugador', p))
-                # Explosión solo si acaba de morir en este frame
+                # Explosion solo si acaba de morir en este frame
                 if not p.vivo and self._frames_explosion:
                     self._efectos_explosion.append(
                         ExplosionEffect(p.shape.centerx, p.shape.centery,
@@ -592,7 +596,7 @@ class PygameView:
 
             modelo.jugador_pos_cache = self.sprite_jugador.shape.center
 
-            if self.audio and modelo.boss and modelo.boss.vivo:
+            if self.audio and modelo.boss_vivo():
                 self.audio.tick_rugido_boss()
         # Portal de avance
         if self.portal_fin:
@@ -612,15 +616,49 @@ class PygameView:
 
         return eventos
 
+    def cerca_de_portal_fin(self) -> bool:
+        return bool(self.portal_fin and self.portal_fin.esta_cerca(self.sprite_jugador.shape))
+
+    def cerca_de_portal_regreso(self) -> bool:
+        return bool(self.portal_regreso and self.portal_regreso.esta_cerca(self.sprite_jugador.shape))
+
+    def cerca_de_portal_final(self) -> bool:
+        return bool(self.portal_final and self.portal_final.esta_cerca(self.sprite_jugador.shape))
+
+    def posicion_jugador(self):
+        return self.sprite_jugador.shape.center
+
+    def cancelar_movimiento_horizontal(self):
+        if self._dir_derecha_pulsada:
+            self.evt_mover_derecha_fin.emit()
+            self._dir_derecha_pulsada = False
+        if self._dir_izquierda_pulsada:
+            self.evt_mover_izquierda_fin.emit()
+            self._dir_izquierda_pulsada = False
+
+    def tiene_frames_daga(self) -> bool:
+        return bool(self._frames_daga_proyectil)
+
+    def frame_daga_referencia(self):
+        return self._frames_daga_proyectil[0]
+
+    @property
+    def daga_pickup_recogida(self) -> bool:
+        return bool(self.sprite_daga_pickup and self.sprite_daga_pickup.recogida)
+
+    def resetear_daga_pickup(self):
+        if self.sprite_daga_pickup:
+            self.sprite_daga_pickup.recogida = False
+
     def aplicar_movimiento_boss(self, modelo):
         """Aplica al sprite del boss el desplazamiento decidido por el Model.
 
-        Se llama DESPUÉS de modelo.tick() (que es quien ahora ejecuta
+        Se llama DESPUES de modelo.tick() (que es quien ahora ejecuta
         boss.tick_ia() internamente y calcula modelo.boss_delta). La Vista
-        se limita a trasladar ese resultado a coordenadas de sprite —no
+        se limita a trasladar ese resultado a coordenadas de sprite --no
         decide ni calcula la IA, solo la dibuja/posiciona.
         """
-        if self.sprite_boss and modelo.boss and modelo.boss.vivo:
+        if self.sprite_boss and modelo.boss_vivo():
             dx, dy = modelo.boss_delta
             self.sprite_boss.shape.x += int(dx)
             self.sprite_boss.shape.y += int(dy)
@@ -629,15 +667,15 @@ class PygameView:
     def _mover_dagas_jugador(self, modelo, eventos):
         """Mueve los proyectiles de daga del jugador y detecta colisiones.
 
-        No llama al Model: añade los impactos detectados a `eventos`
+        No llama al Model: anade los impactos detectados a `eventos`
         (lista compartida con actualizar_fisica) para que el Presenter
-        decida qué hacer con ellos.
+        decida que hacer con ellos.
         """
         for p in modelo.jugador.proyectiles_daga:
             if not p.vivo:
                 continue
 
-            # Colisión con plataformas → destruir
+            # Colision con plataformas -> destruir
             for plat in self.sprites_plataformas:
                 if p.shape.colliderect(plat.shape):
                     p.vivo = False
@@ -646,7 +684,7 @@ class PygameView:
             if not p.vivo:
                 continue
 
-            # Colisión con enemigos
+            # Colision con enemigos
             for i, (sprite_e, enemigo_m) in enumerate(
                 zip(self.sprites_enemigos, modelo.enemigos)
             ):
@@ -658,9 +696,9 @@ class PygameView:
                     eventos.append(('golpe_daga_jugador_a_enemigo', (i, p)))
                     break
 
-            # Colisión con boss
+            # Colision con boss
             if (p.vivo and self.sprite_boss
-                    and modelo.boss and modelo.boss.vivo
+                    and modelo.boss_vivo()
                     and p.shape.colliderect(self.sprite_boss.shape)):
                 if self._frames_hit:
                     self._efectos_hit.append(
@@ -677,7 +715,7 @@ class PygameView:
             self.sprite_daga_pickup.recoger()
             self.evt_daga_recogida.emit()
 
-    # --- Colisión con corazones ---
+    # --- Colision con corazones ---
 
     def _detectar_corazones(self, modelo):
         shape = self.sprite_jugador.shape
@@ -686,13 +724,13 @@ class PygameView:
                 corazon.recoger()
                 self.evt_corazon_recogido.emit(corazon.indice)
 
-    # --- Colisión con pinchos (Spikes) ---
+    # --- Colision con pinchos (Spikes) ---
 
     def _detectar_spikes(self, delta_time_ms):
         """Actualiza barreras sensoras y detecta toques de pinchos.
 
-        Solo detecta y reporta vía evt_spikes_tocados; no decide nada
-        sobre daño, congelado ni respawn — eso lo coordina el Presenter.
+        Solo detecta y reporta via evt_spikes_tocados; no decide nada
+        sobre dano, congelado ni respawn -- eso lo coordina el Presenter.
         """
         shape = self.sprite_jugador.shape
         for sp in self.sprites_spikes:
@@ -709,17 +747,18 @@ class PygameView:
 
     @property
     def fin_de_juego_terminado(self) -> bool:
-        """True cuando la secuencia de fin de juego ya mostró los textos
-        y terminó de esperar: el Presenter debe usar esto para volver
-        al menú principal."""
+        """True cuando la secuencia de fin de juego ya mostro los textos
+        y termino de esperar: el Presenter debe usar esto para volver
+        al menu principal."""
         return self._seq_fin_juego is not None and self._seq_fin_juego.terminado
 
-    def iniciar_fin_de_juego(self):
+    def activar_secuencia_fin_de_juego(self):
         """Arranca la secuencia de fin de juego (fade a negro + textos).
 
-        La llama internamente esta misma clase cuando el jugador pulsa [E]
-        estando cerca del portal_final. A partir de aquí renderizar()
-        deja de dibujar el juego y solo muestra la secuencia.
+        Es el Presenter quien decide CUANDO se debe activar (es una
+        decision de flujo de partida). La Vista solo sabe ejecutarla y
+        dibujarla una vez se le pide: a partir de aqui renderizar() deja
+        de dibujar el juego y solo muestra la secuencia.
         """
         if self._seq_fin_juego is None:
             self._seq_fin_juego = FinDeJuegoSequence(self.screen)
@@ -773,8 +812,8 @@ class PygameView:
                                      # actuar como suelo (solo si veniamos de arriba)
 
         jugador_m._y  = getattr(jugador_m, '_y', float(shape.y))
-        # Si restaurar_pos_jugador fijó un override (carga de partida),
-        # usarlo y descartarlo para que la física parta de la posición correcta.
+        # Si restaurar_pos_jugador fijo un override (carga de partida),
+        # usarlo y descartarlo para que la fisica parta de la posicion correcta.
         override = getattr(self.sprite_jugador, '_y_override', None)
         if override is not None:
             jugador_m._y = override
@@ -812,16 +851,16 @@ class PygameView:
         if not tocando_suelo:
             jugador_m.notificar_en_aire(delta_time_ms)
 
-        # Límites de pantalla
+        # Limites de pantalla
         if shape.bottom >= Constantes.HEIGHT:
             shape.bottom  = Constantes.HEIGHT
             jugador_m._y  = float(shape.y)
             jugador_m.notificar_en_suelo()
-        if shape.top < -5000:  # límite de mundo, no de pantalla
+        if shape.top < -5000:  # limite de mundo, no de pantalla
             shape.top    = -5000
             jugador_m._y = float(shape.y)
             jugador_m.notificar_golpe_techo()
-        # Pasos (solo si está en suelo y moviéndose)
+        # Pasos (solo si esta en suelo y moviendose)
         if self.audio and tocando_suelo and abs(modelo.delta_x_jugador) > 0:
             self.audio.sfx_paso()
 
@@ -847,7 +886,7 @@ class PygameView:
                 if enemigo_m.velocidad_y > Constantes.VELOCIDAD_MAX_CAIDA:
                     enemigo_m.velocidad_y = Constantes.VELOCIDAD_MAX_CAIDA
 
-                # Borde de plataforma: si no hay suelo adelante, invertir dirección
+                # Borde de plataforma: si no hay suelo adelante, invertir direccion
                 # Se aplica siempre, tanto en patrulla como en modo alerta.
                 if delta_x != 0 and enemigo_m.en_suelo:
                     pie_x = (sprite.shape.right + 2) if delta_x > 0 else (sprite.shape.left - 3)
@@ -913,13 +952,13 @@ class PygameView:
                 p._y += p.vel_y
                 p.shape.center = (int(p._x), int(p._y))
 
-                # Colisión proyectil con plataforma
+                # Colision proyectil con plataforma
                 for plat in self.sprites_plataformas:
                     if p.shape.colliderect(plat.shape):
                         p.vivo = False
                         break
 
-                # Explosión al chocar con plataforma (antes de limpiar)
+                # Explosion al chocar con plataforma (antes de limpiar)
                 if not p.vivo and self._frames_explosion:
                     self._efectos_explosion.append(
                         ExplosionEffect(p.shape.centerx, p.shape.centery,
@@ -928,14 +967,14 @@ class PygameView:
             # Limpiar proyectiles muertos
             enemigo_m.proyectiles = [p for p in enemigo_m.proyectiles if p.vivo]
 
-    # --- Detección de combate ---
+    # --- Deteccion de combate ---
 
     def _detectar_combate(self, modelo, eventos):
-        """Comprueba solapamientos de hitboxes y los añade a `eventos`.
+        """Comprueba solapamientos de hitboxes y los anade a `eventos`.
 
-        La Vista solo detecta geometría (qué hitboxes se solapan). Decidir
-        las consecuencias (daño, audio) es responsabilidad del Presenter,
-        que procesa la lista `eventos` tras llamar a este método.
+        La Vista solo detecta geometria (que hitboxes se solapan). Decidir
+        las consecuencias (dano, audio) es responsabilidad del Presenter,
+        que procesa la lista `eventos` tras llamar a este metodo.
         """
         jugador_m     = modelo.jugador
         shape_jugador = self.sprite_jugador.shape
@@ -980,7 +1019,7 @@ class PygameView:
         self.sprite_jugador._hitbox_ataque_cache = hitbox_jugador
 
     def _calcular_hitbox_ataque_jugador(self, shape, flip):
-        """Devuelve la hitbox de ataque del jugador según su posición y dirección."""
+        """Devuelve la hitbox de ataque del jugador segun su posicion y direccion."""
         ancho_hit = Constantes.WIDTH_PERSONAJE * 3
         x = shape.left - ancho_hit if flip else shape.right
         return pygame.Rect(x, shape.top, ancho_hit, shape.height)
@@ -995,13 +1034,13 @@ class PygameView:
         Parameters
         ----------
         estado_jugador : dict
-            Estado lógico del jugador exportado por el Model.
+            Estado logico del jugador exportado por el Model.
         estados_enemigos : list of dict
-            Estados lógicos de los enemigos vivos.
+            Estados logicos de los enemigos vivos.
         modelo : JuegoModel, optional
             Necesario para renderizar el boss si existe.
         """
-        # 1. Sincronizar jugador con su estado lógico y actualizar cámara
+        # 1. Sincronizar jugador con su estado logico y actualizar camara
         self.sprite_jugador.sincronizar(estado_jugador)
         self.camara.update(
             self.sprite_jugador.shape,
@@ -1012,7 +1051,7 @@ class PygameView:
             mirar_abajo=self._mirar_abajo_pulsada,
         )
 
-        # 2. Fondos estáticos
+        # 2. Fondos estaticos
         self.screen.blit(self.fondo, (0, 0))
         self.screen.blit(self.fondo_walls, (0, 0))
 
@@ -1031,7 +1070,7 @@ class PygameView:
         self.sprite_checkpoint.set_mostrar_prompt(cerca_cp)
         self.sprite_checkpoint.draw(self.screen, self.camara)
 
-        # Ángel
+        # Angel
         if self.sprite_angel:
             cerca_angel = self.sprite_angel.esta_cerca(self.sprite_jugador.shape)
             self.sprite_angel.set_mostrar_prompt(cerca_angel)
@@ -1049,17 +1088,17 @@ class PygameView:
         for sprite, estado in zip(self.sprites_enemigos, estados_enemigos):
             sprite.sincronizar(estado)
             sprite.draw(self.screen, self.camara, estado)
-            # El aviso de detección (sonido + "!") respeta un cooldown
+            # El aviso de deteccion (sonido + "!") respeta un cooldown
             # propio del Sprite (ver EnemigoSpriteBase._sincronizar_base).
-            # Es la Vista quien decide aquí si reproducir el SFX, en vez
-            # de que el Model lo dispare directo al AudioManager — así el
-            # cooldown es puramente gráfico/de presentación y no afecta
-            # a la IA de persecución.
+            # Es la Vista quien decide aqui si reproducir el SFX, en vez
+            # de que el Model lo dispare directo al AudioManager -- asi el
+            # cooldown es puramente grafico/de presentacion y no afecta
+            # a la IA de persecucion.
             if self.audio and sprite.aviso_deteccion_listo:
                 self.audio.sfx_deteccion_enemigo()
 
         # Boss
-        if self.sprite_boss and modelo is not None and modelo.boss and modelo.boss.vivo:
+        if self.sprite_boss and modelo is not None and modelo.boss_vivo():
             estado_boss = modelo.boss.obtener_estado(self.sprite_boss.shape.center)
             self.sprite_boss.sincronizar(estado_boss)
             self.sprite_boss.draw(self.screen, self.camara, estado_boss)
@@ -1080,7 +1119,7 @@ class PygameView:
             efecto.draw(self.screen, self.camara)
         self._efectos_sangre = [e for e in self._efectos_sangre if not e.terminado]
 
-        # Efectos de explosión (muerte de proyectiles enemigos)
+        # Efectos de explosion (muerte de proyectiles enemigos)
         for efecto in self._efectos_explosion:
             efecto.update()
             efecto.draw(self.screen, self.camara)
@@ -1102,8 +1141,8 @@ class PygameView:
             self.portal_final.draw(self.screen, self.camara)
 
         # Secuencia de fin de juego: toma el control total de la pantalla
-        # (fade a negro + textos). Mientras esté activa no se dibuja nada
-        # más encima (ni jugador, ni HUD), si no se verían flotando sobre
+        # (fade a negro + textos). Mientras este activa no se dibuja nada
+        # mas encima (ni jugador, ni HUD), si no se verian flotando sobre
         # el fundido a negro.
         if self._seq_fin_juego:
             self._seq_fin_juego.actualizar(self._ultimo_delta_ms)
@@ -1124,7 +1163,7 @@ class PygameView:
 
         # --- Secuencia de Game Over ---
         # Al detectar que el jugador acaba de morir, capturamos el frame
-        # actual (el juego «congelado») y arrancamos el fade a negro.
+        # actual (el juego "congelado") y arrancamos el fade a negro.
         if not estado_jugador['vivo']:
             if self._seq_game_over is None:
                 captura = self.screen.copy()
@@ -1137,7 +1176,7 @@ class PygameView:
     def obtener_estado_jugador(self, modelo):
         """Construye el dict de estado del jugador combinando Model y Vista.
 
-        El Model conoce flags lógicos; la Vista conoce la posición real.
+        El Model conoce flags logicos; la Vista conoce la posicion real.
 
         Parameters
         ----------
@@ -1165,7 +1204,7 @@ class PygameView:
         """Elimina el sprite de un enemigo muerto de la lista."""
         if 0 <= indice < len(self.sprites_enemigos):
             sprite = self.sprites_enemigos[indice]
-            # Disparar efecto de sangre en la posición del enemigo muerto
+            # Disparar efecto de sangre en la posicion del enemigo muerto
             if self._frames_blood:
                 self._efectos_sangre.append(
                     BloodEffect(sprite.shape.centerx, sprite.shape.centery,
@@ -1176,7 +1215,7 @@ class PygameView:
         """Recrea los sprites de enemigos y limpia todos los proyectiles.
 
         Se llama al cargar partida para que los enemigos que hubieran muerto
-        reaparezcan en su posición inicial y la pantalla quede limpia de
+        reaparezcan en su posicion inicial y la pantalla quede limpia de
         proyectiles enemigos (tanto de voladores como del boss).
 
         Parameters
@@ -1210,13 +1249,13 @@ class PygameView:
         self._sprites_dagas     = []
 
     # ------------------------------------------------------------------
-    # Efectos visuales: sangre y explosión
+    # Efectos visuales: sangre y explosion
     # ------------------------------------------------------------------
 
 
     def _cargar_frames_blood(self) -> list:
-        """Carga los 21 frames de la animación de sangre.
-        Devuelve lista vacía si los assets no están disponibles.
+        """Carga los 21 frames de la animacion de sangre.
+        Devuelve lista vacia si los assets no estan disponibles.
         """
         frames = []
         try:
@@ -1236,8 +1275,8 @@ class PygameView:
         return frames
 
     def _cargar_frames_explosion(self) -> list:
-        """Carga los 8 frames de la animación de explosión de proyectiles.
-        Devuelve lista vacía si los assets no están disponibles.
+        """Carga los 8 frames de la animacion de explosion de proyectiles.
+        Devuelve lista vacia si los assets no estan disponibles.
         """
         frames = []
         try:
@@ -1257,13 +1296,13 @@ class PygameView:
         return frames
 
     def _disparar_efectos_muerte_boss(self):
-        """Dispara sangre en las 3 puntas de un triángulo y explosión en el
+        """Dispara sangre en las 3 puntas de un triangulo y explosion en el
         centro, todos centrados sobre el sprite del boss en el momento de morir.
 
-        Triángulo equilátero orientado hacia arriba:
+        Triangulo equilatero orientado hacia arriba:
           - Punta superior    : centro + (0,       -radio)
-          - Punta inf-derecha : centro + (+radio·sin60, +radio·cos60) ≈ (+r·0.866, +r·0.5)
-          - Punta inf-izquierda: centro + (-radio·sin60, +radio·cos60)
+          - Punta inf-derecha : centro + (+radio*sin60, +radio*cos60) ~ (+r*0.866, +r*0.5)
+          - Punta inf-izquierda: centro + (-radio*sin60, +radio*cos60)
         """
         import math
         self._boss_muerte_disparada = True
@@ -1275,7 +1314,7 @@ class PygameView:
         radio  = max(self.sprite_boss.shape.width,
                      self.sprite_boss.shape.height) * 0.35
 
-        # Vértices del triángulo equilátero (punta arriba)
+        # Vertices del triangulo equilatero (punta arriba)
         puntas = [
             (cx,                             cy - radio),             # arriba
             (cx + int(radio * math.sin(math.radians(120))),
@@ -1284,20 +1323,20 @@ class PygameView:
              cy - int(radio * math.cos(math.radians(120)))),          # inf-izquierda
         ]
 
-        # Sangre en las tres puntas (cooldown alto = animación lenta y larga)
+        # Sangre en las tres puntas (cooldown alto = animacion lenta y larga)
         if self._frames_blood:
             for px, py in puntas:
                 self._efectos_sangre.append(
                     BloodEffect(px, py, self._frames_blood, cooldown_ms=100))
 
-        # Explosión en el centro (cooldown alto = animación lenta y larga)
+        # Explosion en el centro (cooldown alto = animacion lenta y larga)
         if self._frames_explosion:
             self._efectos_explosion.append(
                 ExplosionEffect(cx, cy, self._frames_explosion, cooldown_ms=120))
 
     def _cargar_frames_hit(self) -> list:
-        """Carga los 3 frames de la animación de impacto de daga.
-        Devuelve lista vacía si los assets no están disponibles.
+        """Carga los 3 frames de la animacion de impacto de daga.
+        Devuelve lista vacia si los assets no estan disponibles.
         """
         frames = []
         try:
@@ -1321,18 +1360,18 @@ class PygameView:
     # ------------------------------------------------------------------
 
     def _cargar_frames_vida_hud(self) -> dict:
-        """Carga los 3 estados visuales del corazón de vida del HUD.
+        """Carga los 3 estados visuales del corazon de vida del HUD.
 
-        Prueba la ruta indicada y, si falla, variantes razonables (mayúsculas/
-        minúsculas en 'assets', con y sin la 's' final, etc.) para tolerar
-        pequeñas discrepancias entre el nombre de carpeta esperado y el real,
-        ya que en Linux las rutas son sensibles a mayúsculas.
+        Prueba la ruta indicada y, si falla, variantes razonables (mayusculas/
+        minusculas en 'assets', con y sin la 's' final, etc.) para tolerar
+        pequenas discrepancias entre el nombre de carpeta esperado y el real,
+        ya que en Linux las rutas son sensibles a mayusculas.
 
         Returns
         -------
         dict
             Claves 'lleno', 'medio', 'vacio' -> pygame.Surface escalada,
-            o dict vacío si los assets no están disponibles.
+            o dict vacio si los assets no estan disponibles.
         """
         nombres = {
             'lleno': "Hearts_Red_1.png",
@@ -1349,35 +1388,35 @@ class PygameView:
                 try:
                     surface = pygame.image.load(ruta).convert_alpha()
                     if carpeta != carpetas_candidatas[0]:
-                        print(f"[HUD] ⚠ '{carpetas_candidatas[0] + nombre}' no encontrada; "
+                        print(f"[HUD] AVISO '{carpetas_candidatas[0] + nombre}' no encontrada; "
                               f"usando '{ruta}' en su lugar.")
                     break
                 except Exception:
                     continue
             if surface is None:
-                print(f"[HUD] ✗ No se pudo cargar ningún corazón '{nombre}' "
+                print(f"[HUD] ERROR No se pudo cargar ningun corazon '{nombre}' "
                       f"en ninguna de las rutas probadas: "
                       f"{[c + nombre for c in carpetas_candidatas]}")
                 return {}
             w, h = surface.get_width(), surface.get_height()
             frames[clave] = pygame.transform.scale(surface, (int(w * 1.0), int(h * 1.0)))
 
-        print(f"[HUD] ✓ Corazones de vida cargados "
+        print(f"[HUD] OK Corazones de vida cargados "
               f"({frames['lleno'].get_width()}x{frames['lleno'].get_height()} px)")
         return frames
 
     def _cargar_frames_inventario_hud(self) -> dict:
         """Carga el slot de inventario y el icono de la daga del HUD.
 
-        El icono de daga se carga una vez en color y se genera además una
-        versión en gris (para mostrar mientras la habilidad está en
+        El icono de daga se carga una vez en color y se genera ademas una
+        version en gris (para mostrar mientras la habilidad esta en
         cooldown), evitando recalcular el grisado cada frame.
 
         Returns
         -------
         dict
             Claves 'slot', 'daga', 'daga_gris' -> pygame.Surface,
-            o dict vacío si los assets no están disponibles.
+            o dict vacio si los assets no estan disponibles.
         """
         rutas = {
             'slot': "Assets/Interfaz/Objeto/Inventory_Slot_1.png",
@@ -1388,7 +1427,7 @@ class PygameView:
         frames = {}
         for clave, ruta in rutas.items():
             surface = None
-            # Primero la ruta tal cual; si falla, probar variantes de mayúsculas
+            # Primero la ruta tal cual; si falla, probar variantes de mayusculas
             candidatas = [ruta] + [
                 c + ruta.split('/')[-1] for c in carpetas_candidatas if c
             ]
@@ -1399,11 +1438,11 @@ class PygameView:
                 except Exception:
                     continue
             if surface is None:
-                print(f"[HUD] ✗ No se pudo cargar '{ruta}' para el HUD de inventario.")
+                print(f"[HUD] ERROR No se pudo cargar '{ruta}' para el HUD de inventario.")
                 return {}
             frames[clave] = surface
 
-        # Versión en gris del icono de daga (cooldown activo)
+        # Version en gris del icono de daga (cooldown activo)
         gris = frames['daga'].copy()
         arr   = pygame.surfarray.pixels3d(gris)
         alpha = pygame.surfarray.pixels_alpha(gris)
@@ -1419,23 +1458,23 @@ class PygameView:
         del arr, alpha
         frames['daga_gris'] = gris
 
-        print("[HUD] ✓ Iconos de inventario cargados")
+        print("[HUD] OK Iconos de inventario cargados")
         return frames
 
     def _dibujar_corazones_vida(self, hp, hp_max):
         """Dibuja la fila de corazones de vida en la esquina superior izquierda.
 
-        El número de corazones mostrados es siempre hp_max (redondeado al
+        El numero de corazones mostrados es siempre hp_max (redondeado al
         entero superior, por si hp_max llegase a ser fraccionario). Se
-        rellenan de izquierda a derecha según hp: los corazones íntegros
-        primero, luego como máximo un corazón a medias, y el resto vacíos.
+        rellenan de izquierda a derecha segun hp: los corazones integros
+        primero, luego como maximo un corazon a medias, y el resto vacios.
 
         Parameters
         ----------
         hp : int or float
             Vida actual del jugador (puede ser fraccionaria, p.ej. 3.5).
         hp_max : int or float
-            Vida máxima del jugador.
+            Vida maxima del jugador.
         """
         num_corazones = int(round(hp_max))
         if num_corazones <= 0:
@@ -1496,7 +1535,7 @@ class PygameView:
             listo = estado_jugador.get('cooldown_daga_listo', True)
             color = (100, 220, 255) if listo else (140, 140, 140)
             texto_daga = fuente.render(
-                "[L] Daga" + (" ✓" if listo else " …"), True, color)
+                "[L] Daga" + (" OK" if listo else " ..."), True, color)
             y_daga = (20 + self._frames_vida_hud['lleno'].get_height() + 8
                       if self._frames_vida_hud else 52)
             self.screen.blit(texto_daga, (20, y_daga))
@@ -1507,7 +1546,7 @@ class PygameView:
         return self._seq_game_over is not None and self._seq_game_over.terminado
 
     def tick_game_over(self, delta_ms: int):
-        """Avanza el timer de la secuencia de Game Over si está activa."""
+        """Avanza el timer de la secuencia de Game Over si esta activa."""
         if self._seq_game_over and not self._seq_game_over.terminado:
             self._seq_game_over.actualizar(delta_ms)
 
@@ -1515,9 +1554,9 @@ class PygameView:
         """Pinta la pantalla completamente en negro, sin texto.
 
         Usado por el Presenter durante la secuencia de respawn tras
-        tocar unos pinchos (Spikes): congelar 0.5s → pantalla negra 1s
-        → teletransportar al jugador → reanudar.
-        No llama a pygame.display.flip() — lo gestiona el presenter.
+        tocar unos pinchos (Spikes): congelar 0.5s -> pantalla negra 1s
+        -> teletransportar al jugador -> reanudar.
+        No llama a pygame.display.flip() -- lo gestiona el presenter.
         """
         self.screen.fill((0, 0, 0))
         pygame.display.flip()
@@ -1525,9 +1564,9 @@ class PygameView:
     def dibujar_pantalla_cargando(self):
         """Pinta un overlay negro con 'Cargando...' centrado en pantalla.
 
-        Se llama cada frame durante el estado de carga post-restauración,
-        mientras la física resuelve la posición del jugador en silencio.
-        No llama a pygame.display.flip() — lo gestiona el presenter.
+        Se llama cada frame durante el estado de carga post-restauracion,
+        mientras la fisica resuelve la posicion del jugador en silencio.
+        No llama a pygame.display.flip() -- lo gestiona el presenter.
         """
         self.screen.fill((0, 0, 0))
         fuente =  Fuentes.obtener_fuente(58)

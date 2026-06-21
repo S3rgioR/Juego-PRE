@@ -9,7 +9,7 @@ from TileCoords   import tp, tp_abs, tiles_to_px
 # NIVEL 1
 # ===========================================================================
 
-CHECKPOINT_NIVEL_1 = tp_abs(60, 64)
+CHECKPOINT_NIVEL_1 = tp_abs(60, 61)
 
 DATOS_NIVEL_1 = {
     'spawn':      tp_abs(4, 37),          # ← posición de aparición del jugador
@@ -70,7 +70,7 @@ def cargar_nivel_1(tileset: pygame.Surface) -> list:
 # ===========================================================================
 # NIVEL 2
 # ===========================================================================
-CHECKPOINT_NIVEL_2 = tp_abs(102, 86)  # pon aquí las coordenadas que quieras
+CHECKPOINT_NIVEL_2 = tp_abs(102, 84)  # pon aquí las coordenadas que quieras
 
 DATOS_NIVEL_2 = {
     'spawn':      tp_abs(2, 2),          # posición de aparición del jugador
@@ -115,12 +115,12 @@ DATOS_NIVEL_2 = {
 {
             'tipo': 'volador',
             **tp(135, 65),
-            'distancia_patrulla': tiles_to_px(15),
+            'distancia_patrulla': tiles_to_px(10),
         },
 {
             'tipo': 'volador',
             **tp(166, 65),
-            'distancia_patrulla': tiles_to_px(15),
+            'distancia_patrulla': tiles_to_px(6),
         },
     ],
 
@@ -128,16 +128,16 @@ DATOS_NIVEL_2 = {
 
     'angel':      tp(81, 62),
     'portal_regreso': {
-        **tp(3, 3),
+        **tp(5, 3),
         'ancho': 5,
         'alto':  5,
     },
-    'corazones': [tp(200, 87), tp(48, 93)],
+    'corazones': [tp(200, 84), tp(48, 93)],
     'daga_pickup': tp(45, 84),
     'spikes': [],  # se rellena en main.py parseando levels/nivel2.txt
 
     'fin_nivel': {
-        **tp(200, 108),
+        **tp(203, 107),
         'ancho': 5,
         'alto':  5,
     },

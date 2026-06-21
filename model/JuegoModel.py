@@ -20,6 +20,10 @@ class JuegoModel:
     suscribe únicamente a los eventos de esta fachada (evt_enemigo_ataque,
     evt_enemigo_deteccion, evt_boss_disparo) para reproducir sonido,
     sin necesidad de importar OgroModel, FantasmaModel ni BossModel.
+
+    El Presenter y la Vista NUNCA deben leer ni escribir atributos internos
+    de self.boss o self.jugador directamente (p.ej. `.vivo`, `._x`, `._y`).
+    Toda interacción pasa por los métodos públicos de esta fachada.
     """
     def __init__(self, datos_enemigos, datos_boss):
         self.jugador = JugadorModel()
@@ -47,6 +51,12 @@ class JuegoModel:
         # invocar al boss directamente: la Vista solo aporta el dato
         # geométrico (posición), pero no decide ni ejecuta la IA.
         self.boss_pos_cache    = (0, 0)
+
+        # Flag de "el boss acaba de morir este tick", expuesto vía
+        # boss_recien_derrotado() y consumido una sola vez por quien
+        # pregunte primero (normalmente el Presenter, para disparar sfx).
+        self._boss_recien_muerto = False
+        self._boss_muerte_notificada = False
 
     def _crear_enemigos_y_boss(self, datos_enemigos, datos_boss):
         """Crea (o recrea) enemigos y boss a partir de los datos del nivel,
@@ -78,6 +88,7 @@ class JuegoModel:
             self.boss.evt_disparo.add_listener(self.evt_boss_disparo.emit)
         else:
             self.boss = None
+        self._boss_muerte_notificada = False
 
     # --- Acciones del jugador ---
 
@@ -136,6 +147,40 @@ class JuegoModel:
             self.boss.recibir_daño(proyectil.daño)
         proyectil.vivo = False
 
+    # --- Estado del boss (fachada de solo-API para Presenter/Vista) ---
+
+    def boss_vivo(self):
+        """True si hay boss en este nivel y sigue vivo."""
+        return bool(self.boss and self.boss.vivo)
+
+    def boss_derrotado(self):
+        """True si el nivel tiene boss y ya está derrotado (o no tiene boss
+        en absoluto, en cuyo caso se considera 'sin pendiente')."""
+        return self.boss is None or not self.boss.vivo
+
+    def marcar_boss_derrotado(self):
+        """Fuerza al boss como derrotado (usado al cargar partida)."""
+        if self.boss:
+            self.boss.vivo = False
+
+    def boss_recien_derrotado(self):
+        """True una única vez, en el primer tick tras la muerte del boss.
+
+        Encapsula el flag que antes vivía en el Presenter como
+        `_boss_muerto_sonado`, comparando contra `modelo.boss.vivo`
+        directamente. Aquí el propio Model decide y notifica el evento
+        de transición, consumiéndolo para no repetir el aviso.
+        """
+        if self._boss_recien_muerto:
+            self._boss_recien_muerto = False
+            return True
+        return False
+
+    def limpiar_proyectiles_boss(self):
+        """Vacía los proyectiles activos del boss (usado al cargar partida)."""
+        if self.boss:
+            self.boss.proyectiles = []
+
     # --- Tick del Model (llamado por el Presenter cada frame) ---
 
     def tick(self, delta_time_ms):
@@ -164,11 +209,16 @@ class JuegoModel:
             # La IA del boss vive en el Model. La Vista solo le aporta las
             # posiciones (geometría de pantalla) a través de jugador_pos_cache
             # y boss_pos_cache; quien decide y ejecuta el comportamiento del
-            # boss frame a frame es siempre el Model, nunca la Vista.
-            dx, dy, _ = self.boss.tick_ia(
-                self.boss_pos_cache, self.jugador_pos_cache, delta_time_ms
-            )
+            # boss frame a frame es siempre el Model, nunca la Vista. La
+            # Vista nunca escribe _x/_y directamente: pasa por este método
+            # público, igual que cualquier otro dato que cruce de capa.
+            self.boss.sincronizar_posicion(self.boss_pos_cache)
+            dx, dy, _ = self.boss.tick_ia(self.jugador_pos_cache, delta_time_ms)
             self.boss_delta = (dx, dy)
+
+            if not self.boss.vivo and not self._boss_muerte_notificada:
+                self._boss_muerte_notificada = True
+                self._boss_recien_muerto     = True
 
         # Recopilar índices Y tipo ANTES de eliminarlos de la lista
         muertos = [

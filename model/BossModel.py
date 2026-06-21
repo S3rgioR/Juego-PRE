@@ -183,11 +183,35 @@ class BossModel(Actor):
         return self.hp <= self.HP_MAX // 2
 
     # -----------------------------------------------------------------------
+    # Sincronización de posición (llamada por el Model, nunca por la Vista)
+    # -----------------------------------------------------------------------
+
+    def sincronizar_posicion(self, pos):
+        """Actualiza la posición interna del boss a partir de la posición
+        real del sprite en pantalla.
+
+        Único punto de entrada para que la geometría de la Vista llegue al
+        Model: la Vista nunca debe escribir `_x`/`_y` directamente, ya que
+        son atributos internos de implementación de este Model.
+
+        Parameters
+        ----------
+        pos : tuple of (float, float)
+            Centro del sprite del boss en coordenadas de mundo.
+        """
+        self._x = float(pos[0])
+        self._y = float(pos[1])
+
+    # -----------------------------------------------------------------------
     # Tick principal
     # -----------------------------------------------------------------------
 
-    def tick_ia(self, pos_boss, pos_jugador, delta_time_ms):
+    def tick_ia(self, pos_jugador, delta_time_ms):
         """Avanza la IA del boss un frame.
+
+        La posición propia del boss (`_x`, `_y`) ya debe estar al día
+        antes de llamar a este método — ver `sincronizar_posicion()`,
+        que el Model invoca justo antes de tick_ia() en cada frame.
 
         Returns (delta_x, delta_y, nuevos_proyectiles).
         """
@@ -199,10 +223,6 @@ class BossModel(Actor):
         # Actualizar fase
         if self.en_fase2 and self.fase == 1:
             self.fase = 2
-
-        # Sincronizar posición interna
-        self._x = float(pos_boss[0])
-        self._y = float(pos_boss[1])
 
         # Guardar última posición del jugador
         self._last_jpos = pos_jugador
