@@ -1,0 +1,17 @@
+{
+  "hp": 3,
+  "hp_max": 5,
+  "pos": [
+    967,
+    -345
+  ],
+  "camara": [
+    120.21859881593628,
+    -890.0161521373068
+  ],
+  "corazones_recogidos": [],
+  "num_nivel": 1,
+  "daga_desbloqueada": false,
+  "boss_derrotado": true,
+  "daga_recogida": false
+}
