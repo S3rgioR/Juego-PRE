@@ -3,6 +3,7 @@
 import pygame
 from LevelParser  import LevelParser
 from TileCoords   import tp, tp_abs, tiles_to_px
+from Import import obtener_ruta
 
 
 # ===========================================================================
@@ -14,7 +15,7 @@ CHECKPOINT_NIVEL_1 = tp_abs(60, 61)
 DATOS_NIVEL_1 = {
     'spawn':      tp_abs(4, 37),          # ← posición de aparición del jugador
     'checkpoint': CHECKPOINT_NIVEL_1,
-    'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
+    'musica':     obtener_ruta('Assets/Audio/Music/Ambient_Lingering_Action.wav'),
 
     'enemigos': [
         {
@@ -64,7 +65,7 @@ DATOS_NIVEL_1 = {
 
 
 def cargar_nivel_1(tileset: pygame.Surface) -> list:
-    return LevelParser(tileset).cargar('levels/nivel1.txt')
+    return LevelParser(tileset).cargar(obtener_ruta('levels/nivel1.txt'))
 
 
 # ===========================================================================
@@ -75,7 +76,7 @@ CHECKPOINT_NIVEL_2 = tp_abs(102, 84)  # pon aquí las coordenadas que quieras
 DATOS_NIVEL_2 = {
     'spawn':      tp_abs(2, 2),          # posición de aparición del jugador
     'checkpoint': CHECKPOINT_NIVEL_2,
-    'musica':     'Assets/Audio/Music/Ambient_Lingering_Action.wav',
+    'musica':     obtener_ruta('Assets/Audio/Music/Ambient_Lingering_Action.wav'),
 
     'enemigos': [
         {
@@ -145,11 +146,11 @@ DATOS_NIVEL_2 = {
 
 
 def cargar_nivel_2(tileset: pygame.Surface) -> list:
-    return LevelParser(tileset).cargar('levels/nivel2.txt')
+    return LevelParser(tileset).cargar(obtener_ruta('levels/nivel2.txt'))
 DATOS_NIVEL_3 = {
     'spawn':      tp_abs(10, 47),          # posición de aparición del jugador
     'checkpoint': None,
-    'musica':     'Assets/Audio/Music/Boss_Battle_Sequence.wav',
+    'musica':     obtener_ruta('Assets/Audio/Music/Boss_Battle_Sequence.wav'),
 
     'enemigos': [],
 
@@ -172,7 +173,7 @@ DATOS_NIVEL_3 = {
     'fin_nivel': None,
 }
 def cargar_nivel_3(tileset: pygame.Surface) -> list:
-    return LevelParser(tileset).cargar('levels/nivel3.txt')
+    return LevelParser(tileset).cargar(obtener_ruta('levels/nivel3.txt'))
 
 # ===========================================================================
 # Registro de niveles

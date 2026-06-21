@@ -53,6 +53,8 @@ Estructura de carpetas esperada:
 import os
 import random
 import pygame
+from Import import obtener_ruta
+
 
 
 class AudioManager:
@@ -121,23 +123,23 @@ class AudioManager:
         """Carga todos los SFX declarados. Registra advertencia si falta alguno."""
         mapa = {
             # clave            ruta del archivo
-            'paso':            'Assets/Audio/Player/thorn.wav',
-            'salto':           'Assets/Audio/Player/jump_Player.wav',
-            'ataque_jugador':  'Assets/Audio/Player/attac_Player.ogg',
-            'muerte_enemigo1': 'Assets/Audio/Ogro/enemy-death.wav',
-            'ataque_ogro':     'Assets/Audio/Ogro/hit_Ogro.wav',
-            'ataque_enemigo2': 'Assets/Audio/Ghost/shot_Ghost.wav',
-            'muerte_enemigo2': 'Assets/Audio/Ogro/enemy-death.wav',
-            'muerte_boss':     'Assets/Audio/Boss/evil-laugh.mp3',
-            'ataque_boss':     'Assets/Audio/Boss/explosion.wav',
-            'deteccion_enemigo': 'Assets/Audio/Ogro/Detection.wav',
-            'hurt_jugador':    'Assets/Audio/Player/hurt.ogg'
+            'paso':            obtener_ruta('Assets/Audio/Player/thorn.wav'),
+            'salto':           obtener_ruta('Assets/Audio/Player/jump_Player.wav'),
+            'ataque_jugador':  obtener_ruta('Assets/Audio/Player/attac_Player.ogg'),
+            'muerte_enemigo1': obtener_ruta('Assets/Audio/Ogro/enemy-death.wav'),
+            'ataque_ogro':     obtener_ruta('Assets/Audio/Ogro/hit_Ogro.wav'),
+            'ataque_enemigo2': obtener_ruta('Assets/Audio/Ghost/shot_Ghost.wav'),
+            'muerte_enemigo2': obtener_ruta('Assets/Audio/Ogro/enemy-death.wav'),
+            'muerte_boss':     obtener_ruta('Assets/Audio/Boss/evil-laugh.mp3'),
+            'ataque_boss':     obtener_ruta('Assets/Audio/Boss/explosion.wav'),
+            'deteccion_enemigo': obtener_ruta('Assets/Audio/Ogro/Detection.wav'),
+            'hurt_jugador':    obtener_ruta('Assets/Audio/Player/hurt.ogg')
         }
         for clave, ruta in mapa.items():
             self._sfx[clave] = self._cargar_sfx(ruta)
 
         # Cargar rugidos del boss en su propia lista
-        rugido = self._cargar_sfx('Assets/Audio/Boss/evil-laugh.mp3')
+        rugido = self._cargar_sfx(obtener_ruta('Assets/Audio/Boss/evil-laugh.mp3'))
         if rugido:
             self._rugidos_boss.append(rugido)
 

@@ -14,8 +14,10 @@ Uso
 """
 
 import pygame
+from Import import obtener_ruta
 
-RUTA_FUENTE = "Assets/Font/DungeonFont.ttf"
+
+RUTA_FUENTE = obtener_ruta("Assets/Font/DungeonFont.ttf")
 
 # Cache: tamaño (int) -> pygame.font.Font
 _cache_fuentes: dict[int, "pygame.font.Font"] = {}

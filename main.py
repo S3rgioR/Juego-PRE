@@ -11,6 +11,9 @@ from SaveManager   import SaveManager
 from MenuPrincipal import MenuPrincipal
 from view import AudioManager
 from LevelParser import LevelParser
+from Import import obtener_ruta
+
+
 def escalar_img(image, scale):
     w, h = image.get_width(), image.get_height()
     return pygame.transform.scale(image, (int(w * scale), int(h * scale)))
@@ -19,7 +22,7 @@ def escalar_img(image, scale):
 def cargar_frames(patron, n, scale):
     frames = []
     for i in range(1, n + 1):
-        img = pygame.image.load(patron.format(i))
+        img = pygame.image.load(obtener_ruta(patron.format(i)))
         img = escalar_img(img, scale)
         frames.append(img)
     return frames
@@ -27,15 +30,9 @@ def cargar_frames(patron, n, scale):
 
 def _inyectar_anims(datos_nivel, anim_ogre_walk, anim_ogre_attack,
                     anim_volador_walk, anim_boss_nofiro, anim_boss_fire):
-    """Inyecta los frames de animacion en los dicts de entidades del nivel.
-
-    Los .txt y DATOS_NIVEL solo guardan posiciones y parametros numericos;
-    los assets (listas de Surface) se anaden aqui tras cargarlos.
-    Modifica los dicts en-place y devuelve datos_enemigos y datos_boss listos.
-    """
     datos_enemigos = []
     for d in datos_nivel['enemigos']:
-        e = dict(d)   # copia para no mutar el original
+        e = dict(d)
         if e['tipo'] == 'terrestre':
             e.setdefault('anim_walk',   anim_ogre_walk)
             e.setdefault('anim_attack', anim_ogre_attack)
@@ -53,49 +50,38 @@ def _inyectar_anims(datos_nivel, anim_ogre_walk, anim_ogre_attack,
 
 
 def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo=None):
-    """Carga assets, compone MVP e inicia el game loop. Devuelve el presenter.
-
-    Parameters
-    ----------
-    audio : AudioManager
-    num_nivel : int
-        Numero del nivel a cargar (debe existir en NIVELES).
-    cargar_save : bool
-        Si True, restaura la partida guardada al arrancar.
-    """
-
     if num_nivel not in NIVELES:
         print(f"[main] AVISO Nivel {num_nivel} no existe. Cargando nivel 1.")
         num_nivel = 1
 
     nivel_loader, datos_nivel = NIVELES[num_nivel]
+
     # --- Pared del boss (opcional, solo en niveles con boss) ---
-    from LevelParser import LevelParser as _LP
-    _lp_tmp = _LP.__new__(_LP)  # instancia sin tileset para solo leer el txt
     datos_pared_boss = None
     if datos_nivel.get('boss'):
-        # El tileset no importa aqui, solo leemos metadatos
         tileset_tmp = pygame.image.load(
-            "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png"
+            obtener_ruta("Assets/Enviorments/caverns-files-web/layers/tiles_mini.png")
         ).convert_alpha()
         datos_pared_boss = LevelParser(tileset_tmp).cargar_pared_boss(
-            f'levels/nivel{num_nivel}.txt'
+            obtener_ruta(f'levels/nivel{num_nivel}.txt')
         )
+
     datos_portal_regreso = datos_nivel.get('portal_regreso', None)
     datos_portal_final   = datos_nivel.get('portal_final', None)
 
-    # --- Pinchos (Spikes), parseados del .txt del nivel ---
+    # --- Pinchos (Spikes) ---
     tileset_spikes_tmp = pygame.image.load(
-        "Assets/Enviorments/caverns-files-web/layers/tiles_mini.png"
+        obtener_ruta("Assets/Enviorments/caverns-files-web/layers/tiles_mini.png")
     ).convert_alpha()
     datos_spikes = LevelParser(tileset_spikes_tmp).cargar_spikes(
-        f'levels/nivel{num_nivel}.txt'
+        obtener_ruta(f'levels/nivel{num_nivel}.txt')
     )
+
     s = Constantes.SCALA_PERSONAJE
 
-    # --- Dimensiones del personaje (antes de set_mode) ---
+    # --- Dimensiones del personaje ---
     _img_ref = pygame.image.load(
-        "Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png"
+        obtener_ruta("Assets/Characters/Terrible Knight/Sprites/Idle/frame1.png")
     )
     Constantes.WIDTH_PERSONAJE  = int(_img_ref.get_width()  * 0.1  * s)
     Constantes.HEIGHT_PERSONAJE = int(_img_ref.get_height() * 0.35 * s)
@@ -127,16 +113,16 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
     frames_angel = cargar_frames("Assets/Characters/angel/sprites/angel{}.png", 8, s)
 
     img_corazon = escalar_img(
-        pygame.image.load("Assets/Characters/Vida.png").convert_alpha(), s * 0.8)
+        pygame.image.load(obtener_ruta("Assets/Characters/Vida.png")).convert_alpha(), s * 0.8)
 
     img_daga_pickup = escalar_img(
-        pygame.image.load("Assets/Characters/Daga.png").convert_alpha(), s * 0.8)
+        pygame.image.load(obtener_ruta("Assets/Characters/Daga.png")).convert_alpha(), s * 0.8)
 
     img_daga_proj = escalar_img(
-        pygame.image.load("Assets/Characters/Dagger/dagger.png").convert_alpha(), s * 0.6)
+        pygame.image.load(obtener_ruta("Assets/Characters/Dagger/dagger.png")).convert_alpha(), s * 0.6)
     frames_daga_proyectil = [img_daga_proj]
 
-    # --- Inyectar animaciones en los datos del nivel ---
+    # --- Inyectar animaciones ---
     datos_enemigos, datos_boss = _inyectar_anims(
         datos_nivel,
         anim_ogre_walk, anim_ogre_attack,
@@ -158,8 +144,8 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         if estado_jugador_previo.get('daga_desbloqueada'):
             modelo.jugador_desbloquear_daga()
 
-    datos_fin_nivel = datos_nivel.get('fin_nivel', None)
-    datos_spawn     = datos_nivel.get('spawn', None)
+    datos_fin_nivel  = datos_nivel.get('fin_nivel', None)
+    datos_spawn      = datos_nivel.get('spawn', None)
     datos_checkpoint = datos_nivel.get('checkpoint')
 
     vista = PygameView(
@@ -182,7 +168,6 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         datos_portal_regreso  = datos_portal_regreso,
         datos_portal_final    = datos_portal_final,
         datos_spikes          = datos_spikes,
-
     )
 
     presenter = JuegoPresenter(
@@ -193,11 +178,9 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         datos_enemigos=datos_enemigos,
         datos_boss=datos_boss,
     )
-    # Dar al presenter acceso al estado acumulado de niveles anteriores
-    # para que el checkpoint y el portal de regreso lo preserven.
     presenter._estado_jugador_previo = estado_jugador_previo
-    # Arrancar musica del nivel (si no hay ya musica sonando)
-    musica = datos_nivel.get('musica', 'Assets/Audio/Music/Ambient_Lingering_Action.wav')
+
+    musica = datos_nivel.get('musica', obtener_ruta('Assets/Audio/Music/Ambient_Lingering_Action.wav'))
     if audio and not pygame.mixer.music.get_busy():
         audio.reproducir_musica(musica)
 
@@ -214,30 +197,13 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
         if estado_jugador_previo.get('viene_de_retroceso') and 'pos_retroceso' in estado_jugador_previo:
             x, y = estado_jugador_previo['pos_retroceso']
             vista.restaurar_pos_jugador(int(x), int(y))
-
-        # Se entra a este nivel atravesando un portal (avance o retroceso),
-        # no en el primer arranque de la partida: mostrar la misma pantalla
-        # de "Cargando..." que se usa al cargar partida, con el mismo
-        # bloqueo total del juego mientras la fisica resuelve la posicion.
         presenter.activar_pantalla_carga()
 
     presenter.ejecutar()
-
     return presenter
 
 
 def _snapshot_avance_nivel(presenter):
-    """Construye el estado_jugador_previo al completar un nivel.
-
-    Antes vivia inline en main(), tocando directamente
-    `presenter.vista.sprite_jugador.shape.center`: main.py no debe conocer
-    que la posicion del jugador vive en un sprite dentro de la Vista. Ahora
-    pide esa posicion al Presenter a traves de su API publica
-    (`posicion_jugador_actual()`), que es quien sabe delegar en la Vista.
-
-    Compartido por los dos bucles de main() (jugar / cargar) para no
-    duplicar esta construccion dos veces.
-    """
     estado_jugador_previo = presenter.modelo.obtener_estado_guardado()
     estado_jugador_previo['daga_desbloqueada'] = presenter.modelo.jugador.daga_desbloqueada
     estado_jugador_previo['pos_retroceso'] = list(presenter.posicion_jugador_actual())
@@ -256,11 +222,14 @@ def main():
     audio        = AudioManager()
     save_manager = SaveManager()
 
-    audio.reproducir_musica("Assets/Audio/Music/Goblins_Den_(Regular).wav")
+
+    audio.reproducir_musica(obtener_ruta("Assets/Audio/Music/Goblins_Den_(Regular).wav"))
 
     while True:
-        if not pygame.mixer.music.get_busy():
-            audio.reproducir_musica("Assets/Audio/Music/Goblins_Den_(Regular).wav")
+
+
+        pygame.mixer.music.stop()
+        audio.reproducir_musica(obtener_ruta("Assets/Audio/Music/Goblins_Den_(Regular).wav"))
         menu   = MenuPrincipal(screen=pygame.display.get_surface(),
                                tiene_save=save_manager.existe(), audio=audio)
         accion = menu.ejecutar()
@@ -277,21 +246,14 @@ def main():
                 if presenter.salida_forzada:
                     break
                 if presenter.nivel_a_cargar:
-                    # El jugador pidio cargar desde el menu de pausa y el save
-                    # corresponde a un nivel diferente: relanzar en ese nivel.
                     num_nivel = presenter.nivel_a_cargar
                     pygame.mixer.music.stop()
                     presenter = iniciar_partida(audio, num_nivel=num_nivel,
                                                 cargar_save=True)
                     if presenter.salida_forzada:
                         break
-                    # Actualizar num_nivel con el nivel en que termino el presenter
-                    # y sincronizar estado_jugador_previo desde el, para que el
-                    # bucle procese correctamente nivel_completado / nivel_anterior
-                    # sin relanzar el nivel innecesariamente con continue.
                     num_nivel = presenter.num_nivel
                     estado_jugador_previo = presenter._estado_jugador_previo
-                    # Caer al bloque if/elif de abajo para procesar el resultado
                 if presenter.nivel_completado:
                     num_nivel += 1
                     estado_jugador_previo = _snapshot_avance_nivel(presenter)
@@ -299,20 +261,10 @@ def main():
                 elif presenter.nivel_anterior and num_nivel > 1:
                     num_nivel -= 1
                     estado_jugador_previo = presenter.estado_jugador_al_retroceder
-
-                    # Si el presenter tiene un snapshot de niveles anteriores
-                    # (via checkpoint cargado o retroceso previo), recuperarlo.
-                    # Tiene precedencia sobre el estado_jugador_previo del bucle,
-                    # que puede ser None o pertenecer a un nivel diferente.
-                    estado_desde_presenter = estado_jugador_previo.get(
-                        'estado_niveles_anteriores')
+                    estado_desde_presenter = estado_jugador_previo.get('estado_niveles_anteriores')
                     if estado_desde_presenter is not None:
-                        # El portal de regreso ya lleva toda la cadena dentro:
-                        # sustituir estado_jugador_previo por el nivel correcto.
                         estado_jugador_previo = estado_desde_presenter
                     else:
-                        # Fallback: usar el estado acumulado del bucle (puede ser
-                        # None si es la primera vez que se retrocede sin save).
                         pos_retroceso_guardada = (
                             estado_jugador_previo.get('pos_retroceso')
                             if estado_jugador_previo else None
@@ -325,29 +277,24 @@ def main():
                             estado_jugador_previo['pos_retroceso'] = pos_retroceso_guardada
                         if corazones_retroceso_guardados is not None:
                             estado_jugador_previo['corazones_recogidos'] = corazones_retroceso_guardados
-
                     estado_jugador_previo['viene_de_retroceso'] = True
                     pygame.mixer.music.stop()
                 else:
-                    break # volvio al menu sin completar
+                    break
                 pygame.mixer.music.stop()
-
                 if presenter.juego_finalizado:
-                    break  # sale del while de niveles -> vuelve al menu principal
+                    break
             if presenter.salida_forzada:
-                break  # X de la ventana: cierra el juego, no vuelve al menu
+                break
         elif accion == 'cargar':
             pygame.mixer.music.stop()
             datos_save = save_manager.cargar()
             num_nivel = datos_save.get('num_nivel', 1) if datos_save else 1
             estado_jugador_previo = None
-            # Arrancar en el nivel del save y dejar que el bucle de niveles
-            # procese nivel_completado / nivel_anterior normalmente.
             presenter = iniciar_partida(audio, num_nivel=num_nivel, cargar_save=True)
             if presenter.salida_forzada:
                 break
             estado_jugador_previo = presenter._estado_jugador_previo
-            # Procesar el resultado igual que en el bucle jugar
             while True:
                 if presenter.nivel_completado:
                     num_nivel += 1
@@ -380,7 +327,7 @@ def main():
                     num_nivel = presenter.num_nivel
                     estado_jugador_previo = presenter._estado_jugador_previo
             if presenter.salida_forzada:
-                break  # X de la ventana: cierra el juego, no vuelve al menu
+                break
 
     pygame.quit()
     sys.exit()
