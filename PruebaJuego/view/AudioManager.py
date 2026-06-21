@@ -91,6 +91,14 @@ class AudioManager:
         self.volumen_musica = volumen_musica
         self.volumen_sfx    = volumen_sfx
 
+        # Volúmenes "crudos" tal como los fijó el usuario en el menú de config.
+        # El AudioManager aplica: real = crudo_musica * crudo_general (etc.)
+        # MenuConfig lee ESTOS valores, no volumen_musica/volumen_sfx,
+        # para evitar que cada apertura del menú parta de un valor ya reducido.
+        self.volumen_general_raw = 1.0
+        self.volumen_musica_raw  = volumen_musica
+        self.volumen_sfx_raw     = volumen_sfx
+
         # Tablas de SFX: nombre → pygame.Sound o None si el archivo falta.
         self._sfx: dict[str, pygame.Sound | None] = {}
 
@@ -288,6 +296,33 @@ class AudioManager:
     # ------------------------------------------------------------------
     # Control de volumen global
     # ------------------------------------------------------------------
+
+    def set_volumenes(self, general: float, musica: float, sfx: float):
+        """Aplica los tres sliders del menú de configuración de una vez.
+
+        Guarda los valores crudos (lo que muestra el slider) y calcula
+        los volúmenes reales como  real = canal * general.
+
+        Parameters
+        ----------
+        general, musica, sfx : float
+            Valores entre 0.0 y 1.0 tal como vienen de los sliders.
+        """
+        self.volumen_general_raw = max(0.0, min(1.0, general))
+        self.volumen_musica_raw  = max(0.0, min(1.0, musica))
+        self.volumen_sfx_raw     = max(0.0, min(1.0, sfx))
+
+        vol_musica = self.volumen_musica_raw * self.volumen_general_raw
+        vol_sfx    = self.volumen_sfx_raw    * self.volumen_general_raw
+
+        self.volumen_musica = vol_musica
+        self.volumen_sfx    = vol_sfx
+        pygame.mixer.music.set_volume(vol_musica)
+        for sfx_sound in self._sfx.values():
+            if sfx_sound is not None:
+                sfx_sound.set_volume(vol_sfx)
+        for rugido in self._rugidos_boss:
+            rugido.set_volume(vol_sfx)
 
     def set_volumen_sfx(self, volumen: float):
         """Ajusta el volumen de todos los SFX cargados.

@@ -24,9 +24,10 @@ class JugadorModel(Actor):
 
     HP_MAX_BASE      = 5
     COYOTE_TIME      = 300    # ms
+
     COOLDOWN_ANIM    = 70     # ms entre frames de animación de ataque
     COOLDOWN_DAGA_MS = 1500   # ms mínimos entre lanzamientos
-
+    COOLDOWN_ATAQUE_MS = 1000
     def __init__(self):
         self.hp_max = self.HP_MAX_BASE
         super().__init__(hp=self.hp_max, iframe_duracion=1000)
@@ -49,6 +50,8 @@ class JugadorModel(Actor):
         self.proyectiles_daga    = []
         self._ultimo_lanzamiento = -self.COOLDOWN_DAGA_MS   # listo desde el inicio
 
+        self._ultimo_ataque = -self.COOLDOWN_ATAQUE_MS
+
     # --- Acciones ---
 
     def iniciar_ataque(self, num_frames):
@@ -57,6 +60,7 @@ class JugadorModel(Actor):
             self._frame_index       = 0
             self._num_frames_ataque = num_frames
             self._anim_timer        = 0
+            self._ultimo_ataque = self._reloj_ms
 
     def saltar(self):
         if self.en_suelo or self.coyote_timer > 0:
