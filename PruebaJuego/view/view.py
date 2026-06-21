@@ -890,6 +890,14 @@ class PygameView:
                 delta_x, _ = enemigo_m.tick_ia(pos_enemigo, pos_jugador, delta_time_ms,
                                                 tiles_solidos=self._bboxes_plataformas_solidas)
                 sprite.shape.x += delta_x
+                for plat in self.sprites_plataformas_solidas:
+                    if sprite.shape.colliderect(plat.shape):
+                        if delta_x > 0:
+                            sprite.shape.right = plat.shape.left
+                            enemigo_m.flip = True
+                        elif delta_x < 0:
+                            sprite.shape.left = plat.shape.right
+                            enemigo_m.flip = False
 
     # --- Movimiento de proyectiles ---
 

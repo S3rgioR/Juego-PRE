@@ -14,7 +14,7 @@ class FantasmaModel(EnemigoModel):
 
     def __init__(self, x, y, distancia_patrulla=150):
         super().__init__(
-            x, hp=3, iframe_duracion=600,
+            x, hp=3, iframe_duracion=700,
             distancia_patrulla=distancia_patrulla,
             velocidad=2, rango_vision=450,
         )
