@@ -1,17 +1,33 @@
 {
-  "hp": 5,
-  "hp_max": 5,
+  "hp": 6,
+  "hp_max": 7,
   "pos": [
-    983,
-    -345
+    1595,
+    -713
   ],
   "camara": [
-    343.8743887253997,
-    -885.0000000000003
+    955.0371593190351,
+    -1253.0001763839746
   ],
-  "corazones_recogidos": [],
-  "num_nivel": 1,
-  "daga_desbloqueada": false,
+  "corazones_recogidos": [
+    0,
+    1
+  ],
+  "num_nivel": 2,
+  "daga_desbloqueada": true,
   "boss_derrotado": true,
-  "daga_recogida": false
+  "daga_recogida": true,
+  "estado_niveles_anteriores": {
+    "hp": 6,
+    "hp_max": 6,
+    "daga_desbloqueada": false,
+    "pos_retroceso": [
+      3286,
+      -585
+    ],
+    "corazones_recogidos": [
+      0
+    ],
+    "daga_recogida": false
+  }
 }

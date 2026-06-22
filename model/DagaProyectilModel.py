@@ -5,13 +5,18 @@ Se destruye al:
   - Tocar una plataforma/pared.
   - Superar la distancia máxima (WIDTH / 2).
   - Tocar a un enemigo (la Vista lo notifica).
+
+Hereda de ProyectilBase (no de ProyectilModel: el constructor y la
+forma de moverse son demasiado distintos — la daga no apunta a un
+target_x/target_y, va recta según `flip`, y es ella misma quien se
+mueve en actualizar(), no la Vista).
 """
 
-import pygame
 import Constantes
+from .ProyectilBase import ProyectilBase
 
 
-class DagaProyectilModel:
+class DagaProyectilModel(ProyectilBase):
     """Proyectil de daga del jugador.
 
     Attributes
@@ -33,7 +38,7 @@ class DagaProyectilModel:
     DAÑO         = 1
 
     def __init__(self, x: int, y: int, flip: bool,
-                 frame_ref: pygame.Surface):
+                 frame_ref):
         """
         Parameters
         ----------
@@ -44,18 +49,11 @@ class DagaProyectilModel:
         frame_ref : pygame.Surface
             Primer frame del sprite, para calcular el tamaño del shape.
         """
-        self.flip  = flip
-        self.vivo  = True
-        self.daño  = self.DAÑO
+        super().__init__(x, y, frame_ref.get_width(), frame_ref.get_height(), flip)
 
-        self.shape = pygame.Rect(0, 0,
-                                 frame_ref.get_width(),
-                                 frame_ref.get_height())
-        self.shape.center = (x, y)
+        self.daño = self.DAÑO
 
         self.vel_x      = -self.VELOCIDAD if flip else self.VELOCIDAD
-        self._x         = float(x)
-        self._y         = float(y)
         self._origen_x  = float(x)   # para medir distancia recorrida
 
     # ------------------------------------------------------------------ #
@@ -70,10 +68,3 @@ class DagaProyectilModel:
 
         if abs(self._x - self._origen_x) >= self.DISTANCIA_MAX:
             self.vivo = False
-
-    def obtener_estado(self) -> dict:
-        return {
-            'pos':  self.shape.center,
-            'flip': self.flip,
-            'vivo': self.vivo,
-        }

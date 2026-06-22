@@ -10,11 +10,18 @@ Devuelve una acción o None si el menú sigue abierto:
   'cargar'      → cargar partida guardada
   'config'      → reservado (de momento no hace nada)
   'menu_principal' → salir al menú principal sin guardar
+
+Hereda de MenuBase la lógica de selección/navegación/click; aquí solo
+queda lo específico de este menú: el panel flotante sobre el frame
+congelado, su paleta propia, y los rects "locales" (relativos al
+panel) que necesita para dibujar, además de los "globales" (en
+coordenadas de pantalla) que usa MenuBase para detectar clicks.
 """
 
 import pygame
 import Constantes
 import Fuentes
+from Menu import MenuBase, PanelFlotante
 
 
 # ── Paleta (coordinada con MenuPrincipal pero más compacta) ─────────────────
@@ -29,7 +36,7 @@ COLOR_BTN_DISABLED  = (45,  45,  52)
 COLOR_TEXTO_DISABLED= (95,  95, 105)
 
 
-class MenuPausa:
+class MenuPausa(MenuBase, PanelFlotante):
     """Recuadro de pausa superpuesto sobre el juego congelado.
 
     Parameters
@@ -47,6 +54,8 @@ class MenuPausa:
         ('menu_principal',  'Ir al menu principal'),
     ]
 
+    ACCION_ESCAPE = 'reanudar'
+
     PANEL_ANCHO = 380
     PANEL_ALTO  = 340
     BTN_ANCHO   = 300
@@ -55,46 +64,32 @@ class MenuPausa:
     BTN_RADIO   = 7
 
     def __init__(self, screen: pygame.Surface, tiene_save: bool = False):
-        self.screen     = screen
-        self.tiene_save = tiene_save
-        self.seleccion  = 0
+        MenuBase.__init__(self, tiene_save=tiene_save)
+        PanelFlotante.__init__(self, screen, self.PANEL_ANCHO, self.PANEL_ALTO)
 
         self._fuente_titulo = Fuentes.obtener_fuente(48)
         self._fuente_btn    = Fuentes.obtener_fuente(34)
         self._fuente_sub    = Fuentes.obtener_fuente(22)
 
-        # Panel centrado en pantalla
-        self._panel_rect = pygame.Rect(
-            0, 0, self.PANEL_ANCHO, self.PANEL_ALTO
-        )
-        self._panel_rect.center = (Constantes.WIDTH // 2, Constantes.HEIGHT // 2)
-
-        # Superficie del panel (con alpha)
-        self._panel_surf = pygame.Surface(
-            (self.PANEL_ANCHO, self.PANEL_ALTO), pygame.SRCALPHA
-        )
-
-        # Rects de los botones, relativos al panel
+        # Rects de los botones, relativos al panel (para dibujar) y en
+        # coordenadas de pantalla (self._rects, heredado de MenuBase,
+        # usado para detección de hover/click).
         total_alto = (len(self.OPCIONES) * self.BTN_ALTO
                       + (len(self.OPCIONES) - 1) * self.BTN_GAP)
         inicio_y   = self.PANEL_ALTO // 2 - total_alto // 2 + 20
         cx         = self.PANEL_ANCHO // 2
 
-        self._rects_locales = []   # coords dentro del panel
-        self._rects_globales = []  # coords en la ventana (para detección de clic)
+        self._rects_locales = []
         for i in range(len(self.OPCIONES)):
             y    = inicio_y + i * (self.BTN_ALTO + self.BTN_GAP)
             rect = pygame.Rect(0, 0, self.BTN_ANCHO, self.BTN_ALTO)
             rect.center = (cx, y)
             self._rects_locales.append(rect)
 
-            rect_global = rect.move(self._panel_rect.left, self._panel_rect.top)
-            self._rects_globales.append(rect_global)
-
-    # ── Helpers ─────────────────────────────────────────────────────────────
-
-    def _esta_deshabilitado(self, accion: str) -> bool:
-        return accion == 'cargar' and not self.tiene_save
+        # self._rects (global, en pantalla) lo espera MenuBase para
+        # hover/click; lo derivamos de los locales + posición del panel.
+        self._rects = [r.move(self._panel_rect.left, self._panel_rect.top)
+                        for r in self._rects_locales]
 
     # ── Dibujo ──────────────────────────────────────────────────────────────
 
@@ -159,50 +154,4 @@ class MenuPausa:
              self.PANEL_ALTO - 25)
         )
 
-        self.screen.blit(self._panel_surf, self._panel_rect)
-
-    # ── Procesar eventos ────────────────────────────────────────────────────
-
-    def procesar_evento(self, event) -> str | None:
-        """Procesa un evento pygame y devuelve la acción elegida o None.
-
-        El Presenter pasa cada evento a este método mientras está pausado.
-
-        Parameters
-        ----------
-        event : pygame.Event
-
-        Returns
-        -------
-        str or None
-            Acción elegida, o None si el menú sigue abierto.
-        """
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                return 'reanudar'
-
-            elif event.key in (pygame.K_DOWN, pygame.K_s):
-                self.seleccion = (self.seleccion + 1) % len(self.OPCIONES)
-
-            elif event.key in (pygame.K_UP, pygame.K_w):
-                self.seleccion = (self.seleccion - 1) % len(self.OPCIONES)
-
-            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                accion = self.OPCIONES[self.seleccion][0]
-                if not self._esta_deshabilitado(accion):
-                    return accion
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for rect_g, (accion, _) in zip(self._rects_globales, self.OPCIONES):
-                if rect_g.collidepoint(event.pos):
-                    if not self._esta_deshabilitado(accion):
-                        return accion
-
-        return None
-
-    def hover_idx(self, mouse_pos) -> int:
-        """Devuelve el índice del botón bajo el ratón, o -1."""
-        for i, rect_g in enumerate(self._rects_globales):
-            if rect_g.collidepoint(mouse_pos):
-                return i
-        return -1
+        self._blit_panel()

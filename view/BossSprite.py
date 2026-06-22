@@ -22,6 +22,7 @@ import math
 import pygame
 import Constantes
 from .VisualEffects import aplicar_tinte
+from .ProyectilSpriteBase import ProyectilSpriteBase
 
 
 class BossSprite:
@@ -248,14 +249,12 @@ class BossSprite:
 # Sprite visual de los proyectiles del boss
 # ---------------------------------------------------------------------------
 
-class ProyectilBossSprite:
+class ProyectilBossSprite(ProyectilSpriteBase):
     """Sprite visual de un proyectil del boss con escala variable."""
 
     def __init__(self, frames):
-        self.frames      = frames
-        self.frame_index = 0
-        self.update_time = pygame.time.get_ticks()
-        self.shape       = pygame.Rect(
+        super().__init__(frames)
+        self.shape = pygame.Rect(
             0, 0,
             frames[0].get_width(),
             frames[0].get_height(),
@@ -265,12 +264,9 @@ class ProyectilBossSprite:
         """Dibuja el proyectil escalado según su 'escala' en el estado."""
         escala = estado.get('escala', 1.0)
 
-        # Avanzar animación
-        if pygame.time.get_ticks() - self.update_time > 80:
-            self.frame_index = (self.frame_index + 1) % len(self.frames)
-            self.update_time = pygame.time.get_ticks()
+        self._avanzar_frame()
 
-        frame_base = self.frames[self.frame_index]
+        frame_base = self._frame_actual()
 
         # Escalar si es necesario
         if escala != 1.0:

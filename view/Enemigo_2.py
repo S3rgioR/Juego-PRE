@@ -4,6 +4,7 @@ import pygame
 import Constantes
 import numpy
 import math
+from .ProyectilSpriteBase import ProyectilSpriteBase
 
 
 class Enemigo2Sprite:
@@ -114,20 +115,16 @@ class Enemigo2Sprite:
         interfaz.blit(txt, (pos_x, pos_y))
 
 
-class ProyectilSprite:
+class ProyectilSprite(ProyectilSpriteBase):
     def __init__(self, frames):
-        self.frames      = frames
-        self.frame_index = 0
-        self.update_time = pygame.time.get_ticks()
-        self.shape       = pygame.Rect(0, 0, frames[0].get_width(), frames[0].get_height())
+        super().__init__(frames)
+        self.shape = pygame.Rect(0, 0, frames[0].get_width(), frames[0].get_height())
 
     def draw(self, interfaz, camara, estado):
         self.shape.center = (int(estado['pos'][0]), int(estado['pos'][1]))
 
-        if pygame.time.get_ticks() - self.update_time > 80:
-            self.frame_index = (self.frame_index + 1) % len(self.frames)
-            self.update_time = pygame.time.get_ticks()
+        self._avanzar_frame()
 
-        imagen = pygame.transform.flip(self.frames[self.frame_index], estado['flip'], False)
+        imagen = pygame.transform.flip(self._frame_actual(), estado['flip'], False)
         interfaz.blit(imagen, camara.aplicar(self.shape))
         pygame.draw.rect(interfaz, (255, 165, 0), camara.aplicar(self.shape), 1)
