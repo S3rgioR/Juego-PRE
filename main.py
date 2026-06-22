@@ -98,6 +98,8 @@ def iniciar_partida(audio, num_nivel=1, cargar_save=False, estado_jugador_previo
             "Assets/Characters/Terrible Knight/Sprites/SwordSlash/frame{}.png", 4, s),
         'AtaqueSalto': cargar_frames(
             "Assets/Characters/Terrible Knight/Sprites/AirSwordSlash/AirSwordSlash-export{}.png", 6, s),
+        'LanzarDaga': cargar_frames(
+            "Assets/Characters/Terrible Knight/Sprites/AttackSide/attackside-export{}.png", 2, s),
     }
 
     # --- Assets de enemigos ---

@@ -192,7 +192,8 @@ class BossSprite:
         interfaz.blit(img_final, camara.aplicar(img_rect))
 
         # Debug: hitbox
-        pygame.draw.rect(interfaz, (255, 50, 200), camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES:
+            pygame.draw.rect(interfaz, (255, 50, 200), camara.aplicar(self.shape), 1)
 
         # --- Barra de vida (en coordenadas de pantalla, no de mundo) ---
         self._dibujar_barra_vida(interfaz)
@@ -270,8 +271,8 @@ class ProyectilBossSprite(ProyectilSpriteBase):
 
         # Escalar si es necesario
         if escala != 1.0:
-            w = int(frame_base.get_width()  * escala)
-            h = int(frame_base.get_height() * escala)
+            w = int(frame_base.get_width()  * escala*0.6)
+            h = int(frame_base.get_height() * escala*0.6)
             frame_base = pygame.transform.scale(frame_base, (w, h))
 
         imagen = pygame.transform.flip(frame_base, estado['flip'], False)
@@ -282,5 +283,6 @@ class ProyectilBossSprite(ProyectilSpriteBase):
         interfaz.blit(imagen, camara.aplicar(self.shape))
 
         # Debug: hitbox naranja para proyectiles normales, amarilla para grandes
-        color_debug = (255, 200, 0) if escala > 1.5 else (255, 140, 0)
-        pygame.draw.rect(interfaz, color_debug, camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES:
+            color_debug = (255, 200, 0) if escala > 1.5 else (255, 140, 0)
+            pygame.draw.rect(interfaz, color_debug, camara.aplicar(self.shape), 1)

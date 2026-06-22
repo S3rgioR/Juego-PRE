@@ -2,6 +2,8 @@
 
 import pygame
 import math
+
+import Constantes
 from .EnemigoSpriteBase import EnemigoSpriteBase
 
 
@@ -34,8 +36,8 @@ class FantasmaSprite(EnemigoSpriteBase):
         img_rect.y += int(self._flotacion_offset)
 
         self._blit_con_iframe(interfaz, camara, imagen_flip, img_rect)
-
-        pygame.draw.rect(interfaz, (0, 180, 255), camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES:
+            pygame.draw.rect(interfaz, (0, 180, 255), camara.aplicar(self.shape), 1)
 
         self._tick_exclamacion(interfaz, camara)
 
@@ -75,4 +77,5 @@ class ProyectilSprite:
 
         imagen = pygame.transform.flip(self.frames[self.frame_index], estado["flip"], False)
         interfaz.blit(imagen, camara.aplicar(self.shape))
-        pygame.draw.rect(interfaz, (255, 165, 0), camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES:
+            pygame.draw.rect(interfaz, (255, 165, 0), camara.aplicar(self.shape), 1)

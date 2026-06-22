@@ -169,7 +169,7 @@ class PygameView:
         ]
 
         # --- Proyectiles de enemigos ---
-        escala_proj = Constantes.SCALA_PERSONAJE * 0.6
+        escala_proj = Constantes.SCALA_PERSONAJE * 1
         frames_proyectil = []
         for i in range(1, 3):
             img = pygame.image.load(
@@ -315,6 +315,11 @@ class PygameView:
         self._frames_daga_proyectil = frames_daga_proyectil or []
         # Pool de sprites: se crea uno nuevo por cada proyectil vivo
         self._sprites_dagas: list[DagaProyectilSprite] = []
+        # Identidades de proyectiles de daga ya detectados, para distinguir
+        # un proyectil "nuevo" (lanzamiento real) de uno que ya existia.
+        # No se puede usar solo el tamano de la lista del Model porque esta
+        # fluctua (los proyectiles muertos se eliminan), no es monotona.
+        self._ids_proyectiles_daga_vistos = set()
 
         # --- Eventos MVP ---
         self.evt_cerrar                 = Event()
@@ -679,7 +684,18 @@ class PygameView:
         (lista compartida con actualizar_fisica) para que el Presenter
         decida que hacer con ellos.
         """
+        ids_actuales = set()
         for p in modelo.jugador.proyectiles_daga:
+            ids_actuales.add(id(p))
+
+            # Proyectil que no se habia visto antes -> lanzamiento real y
+            # nuevo confirmado por el Model. Es el disparador correcto de
+            # la animacion (no la pulsacion de tecla ni el tamano del pool
+            # de sprites, que no es monotono porque los proyectiles muertos
+            # se eliminan de la lista del Model).
+            if id(p) not in self._ids_proyectiles_daga_vistos:
+                self.sprite_jugador.iniciar_animacion_lanzar_daga()
+
             if not p.vivo:
                 continue
 
@@ -713,6 +729,8 @@ class PygameView:
                         HitEffect(p.shape.centerx, p.shape.centery,
                                   self._frames_hit))
                 eventos.append(('golpe_daga_jugador_a_boss', p))
+
+        self._ids_proyectiles_daga_vistos = ids_actuales
 
     # --- Recoger objeto daga del suelo ---
 
@@ -1114,7 +1132,10 @@ class PygameView:
         # Proyectiles de daga del jugador
         if modelo is not None:
             estados_dagas = estado_jugador.get('proyectiles_daga', [])
-            # Ajustar pool de sprites
+            # Ajustar pool de sprites visuales (uno por proyectil vivo).
+            # La deteccion de "lanzamiento nuevo" para la animacion vive en
+            # _mover_dagas_jugador, donde se compara contra la lista real
+            # del Model por identidad, no aqui por tamano de pool.
             while len(self._sprites_dagas) < len(estados_dagas):
                 self._sprites_dagas.append(
                     DagaProyectilSprite(self._frames_daga_proyectil))
@@ -1165,10 +1186,9 @@ class PygameView:
         self.dibujar_hud(estado_jugador)
 
         # Debug: trigger de fin de nivel (solo en desarrollo)
-        if self._trigger_fin_nivel:
+        if Constantes.DEBUG_HITBOXES and self._trigger_fin_nivel:
             pygame.draw.rect(self.screen, (0, 255, 100),
                              self.camara.aplicar(self._trigger_fin_nivel), 3)
-
         # --- Secuencia de Game Over ---
         # Al detectar que el jugador acaba de morir, capturamos el frame
         # actual (el juego "congelado") y arrancamos el fade a negro.
@@ -1255,6 +1275,7 @@ class PygameView:
         self._efectos_explosion = []
         self._efectos_hit       = []
         self._sprites_dagas     = []
+        self._ids_proyectiles_daga_vistos = set()
 
     # ------------------------------------------------------------------
     # Efectos visuales: sangre y explosion

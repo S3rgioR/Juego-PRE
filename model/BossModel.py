@@ -39,8 +39,8 @@ class ProyectilBoss(ProyectilModel):
         self.vel_x = (dx / dist) * velocidad
         self.vel_y = (dy / dist) * velocidad
 
-        w = int(Constantes.WIDTH_PERSONAJE  * 0.8 * escala)
-        h = int(Constantes.HEIGHT_PERSONAJE * 0.8 * escala)
+        w = int(Constantes.WIDTH_PERSONAJE  * 0.4 * escala)
+        h = int(Constantes.HEIGHT_PERSONAJE * 0.4 * escala)
         centro = self.shape.center
         self.shape = pygame.Rect(0, 0, w, h)
         self.shape.center = centro
