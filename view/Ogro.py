@@ -2,6 +2,7 @@
 
 import pygame
 from .EnemigoSpriteBase import EnemigoSpriteBase
+import Constantes
 
 
 class OgroSprite(EnemigoSpriteBase):
@@ -31,10 +32,10 @@ class OgroSprite(EnemigoSpriteBase):
         img_rect    = imagen_flip.get_rect(midbottom=self.shape.midbottom)
 
         self._blit_con_iframe(interfaz, camara, imagen_flip, img_rect)
-
         # Debug hitboxes
-        pygame.draw.rect(interfaz, (255, 0, 0), camara.aplicar(self.shape), 1)
-        if self.hitbox_ataque:
+        if Constantes.DEBUG_HITBOXES:
+            pygame.draw.rect(interfaz, (255, 0, 0), camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES and self.hitbox_ataque:
             pygame.draw.rect(interfaz, (255, 255, 0), camara.aplicar(self.hitbox_ataque), 2)
 
         self._tick_exclamacion(interfaz, camara)

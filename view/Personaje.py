@@ -64,6 +64,25 @@ class PersonajeSprite:
         self.hitbox_ataque = None
         self.en_suelo = False
 
+        # --- Animacion puntual de lanzar daga (puramente visual) ---
+        # No es un "estado" persistente del Model: es una animacion corta
+        # que se reproduce una vez y luego cede el control a la seleccion
+        # normal de animacion segun el estado logico del jugador.
+        self._lanzando_daga = False
+        self._frame_index_lanzar = 0
+
+    def iniciar_animacion_lanzar_daga(self):
+        """Activa la animacion corta de lanzar daga (2 frames, sin loop).
+
+        Pensada para ser invocada por la Vista cuando el Presenter confirma
+        que la daga se ha lanzado de verdad (daga desbloqueada, etc.).
+        """
+        if 'LanzarDaga' not in self.frames or not self.frames['LanzarDaga']:
+            return
+        self._lanzando_daga = True
+        self._frame_index_lanzar = 0
+        self.update_time = pygame.time.get_ticks()
+
     def sincronizar(self, estado_modelo):
         """Actualiza el sprite con los datos actuales del Model.
 
@@ -92,6 +111,28 @@ class PersonajeSprite:
         atacando  = estado_modelo['atacando']
         en_suelo  = estado_modelo['en_suelo']
         moviendose = estado_modelo['moviendose']
+
+        # La animacion de lanzar daga tiene prioridad visual momentanea:
+        # se reproduce una vez (sin loop) y luego vuelve al flujo normal.
+        if self._lanzando_daga:
+            nueva_anim = self.frames['LanzarDaga']
+            if nueva_anim != self.animaciones:
+                self.animaciones = nueva_anim
+                self.frame_index = self._frame_index_lanzar
+
+            cooldown_animacion = 70
+            if pygame.time.get_ticks() - self.update_time > cooldown_animacion:
+                self.frame_index += 1
+                self.update_time = pygame.time.get_ticks()
+
+            if self.frame_index >= len(self.animaciones):
+                # Animacion terminada: ceder el control a la seleccion normal.
+                self._lanzando_daga = False
+                self.frame_index = 0
+            else:
+                self.image = self.animaciones[self.frame_index]
+                self.hitbox_ataque = None
+                return
 
         if atacando:
             nueva_anim = self.frames['AtaqueSalto'] if not en_suelo else self.frames['AtaqueParado']
@@ -157,8 +198,8 @@ class PersonajeSprite:
 
 
         # Debug: hitbox del personaje
-        pygame.draw.rect(interfaz, Constantes.COLOR_PERSONAJE, camara.aplicar(self.shape), 1)
-
+        if Constantes.DEBUG_HITBOXES:
+            pygame.draw.rect(interfaz, Constantes.COLOR_PERSONAJE, camara.aplicar(self.shape), 1)
         # Debug: hitbox de ataque
-        if self.hitbox_ataque:
+        if Constantes.DEBUG_HITBOXES and self.hitbox_ataque:
             pygame.draw.rect(interfaz, (255, 255, 0), camara.aplicar(self.hitbox_ataque), 2)

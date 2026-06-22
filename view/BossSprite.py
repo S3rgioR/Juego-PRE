@@ -22,6 +22,7 @@ import math
 import pygame
 import Constantes
 from .VisualEffects import aplicar_tinte
+from .ProyectilSpriteBase import ProyectilSpriteBase
 
 
 class BossSprite:
@@ -191,7 +192,8 @@ class BossSprite:
         interfaz.blit(img_final, camara.aplicar(img_rect))
 
         # Debug: hitbox
-        pygame.draw.rect(interfaz, (255, 50, 200), camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES:
+            pygame.draw.rect(interfaz, (255, 50, 200), camara.aplicar(self.shape), 1)
 
         # --- Barra de vida (en coordenadas de pantalla, no de mundo) ---
         self._dibujar_barra_vida(interfaz)
@@ -248,14 +250,12 @@ class BossSprite:
 # Sprite visual de los proyectiles del boss
 # ---------------------------------------------------------------------------
 
-class ProyectilBossSprite:
+class ProyectilBossSprite(ProyectilSpriteBase):
     """Sprite visual de un proyectil del boss con escala variable."""
 
     def __init__(self, frames):
-        self.frames      = frames
-        self.frame_index = 0
-        self.update_time = pygame.time.get_ticks()
-        self.shape       = pygame.Rect(
+        super().__init__(frames)
+        self.shape = pygame.Rect(
             0, 0,
             frames[0].get_width(),
             frames[0].get_height(),
@@ -265,17 +265,14 @@ class ProyectilBossSprite:
         """Dibuja el proyectil escalado según su 'escala' en el estado."""
         escala = estado.get('escala', 1.0)
 
-        # Avanzar animación
-        if pygame.time.get_ticks() - self.update_time > 80:
-            self.frame_index = (self.frame_index + 1) % len(self.frames)
-            self.update_time = pygame.time.get_ticks()
+        self._avanzar_frame()
 
-        frame_base = self.frames[self.frame_index]
+        frame_base = self._frame_actual()
 
         # Escalar si es necesario
         if escala != 1.0:
-            w = int(frame_base.get_width()  * escala)
-            h = int(frame_base.get_height() * escala)
+            w = int(frame_base.get_width()  * escala*0.6)
+            h = int(frame_base.get_height() * escala*0.6)
             frame_base = pygame.transform.scale(frame_base, (w, h))
 
         imagen = pygame.transform.flip(frame_base, estado['flip'], False)
@@ -286,5 +283,6 @@ class ProyectilBossSprite:
         interfaz.blit(imagen, camara.aplicar(self.shape))
 
         # Debug: hitbox naranja para proyectiles normales, amarilla para grandes
-        color_debug = (255, 200, 0) if escala > 1.5 else (255, 140, 0)
-        pygame.draw.rect(interfaz, color_debug, camara.aplicar(self.shape), 1)
+        if Constantes.DEBUG_HITBOXES:
+            color_debug = (255, 200, 0) if escala > 1.5 else (255, 140, 0)
+            pygame.draw.rect(interfaz, color_debug, camara.aplicar(self.shape), 1)

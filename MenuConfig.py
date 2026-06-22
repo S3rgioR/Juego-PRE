@@ -12,6 +12,7 @@ Controles:
 import pygame
 import Constantes
 import Fuentes
+from Menu import PanelFlotante
 
 # ── Paleta (igual que MenuPausa) ────────────────────────────────────────────
 COLOR_PANEL_FONDO  = (15,  15,  35, 220)
@@ -31,7 +32,7 @@ COLOR_TOGGLE_ON    = (90, 170,  90)
 COLOR_TOGGLE_OFF   = (80,  40,  40)
 
 
-class MenuConfig:
+class MenuConfig(PanelFlotante):
     """Panel de configuración superpuesto sobre la pantalla.
 
     Parameters
@@ -74,7 +75,7 @@ class MenuConfig:
     ]
 
     def __init__(self, screen: pygame.Surface, audio):
-        self.screen      = screen
+        super().__init__(screen, self.PANEL_ANCHO, self.PANEL_ALTO)
         self.audio       = audio
         self.subpantalla = 'audio'   # 'audio' | 'controles'
         self.seleccion   = 0
@@ -88,13 +89,6 @@ class MenuConfig:
         self._fuente_sub     = Fuentes.obtener_fuente(21)
         self._fuente_tecla   = Fuentes.obtener_fuente(25)
         self._fuente_control = Fuentes.obtener_fuente(26)
-
-        # Panel centrado
-        self._panel_rect = pygame.Rect(0, 0, self.PANEL_ANCHO, self.PANEL_ALTO)
-        self._panel_rect.center = (Constantes.WIDTH // 2, Constantes.HEIGHT // 2)
-        self._panel_surf = pygame.Surface(
-            (self.PANEL_ANCHO, self.PANEL_ALTO), pygame.SRCALPHA
-        )
 
         # Volúmenes actuales — se leen de los valores "crudos" del AudioManager
         # (lo que el usuario puso en el slider), NO de volumen_musica/sfx que
@@ -150,12 +144,6 @@ class MenuConfig:
         btn.bottom  = self._panel_rect.bottom - 40
         self._btn_volver_rect = btn
 
-    # ── Helpers locales ──────────────────────────────────────────────────────
-
-    def _local(self, rect: pygame.Rect) -> pygame.Rect:
-        """Convierte un Rect de pantalla a coordenadas locales del panel."""
-        return rect.move(-self._panel_rect.x, -self._panel_rect.y)
-
     # ── Dibujo ──────────────────────────────────────────────────────────────
 
     def dibujar(self, hover_btn: bool = False, hover_tab: str = None):
@@ -198,14 +186,14 @@ class MenuConfig:
 
         # Pista inferior
         if self.subpantalla == 'audio':
-            pista_txt = "W S ·   Esc volver"
+            pista_txt = "W S    Esc volver"
         else:
             pista_txt = "Esc para volver"
         pista = self._fuente_sub.render(pista_txt, True, (90, 85, 110))
         s.blit(pista, (self.PANEL_ANCHO // 2 - pista.get_width() // 2,
                        self.PANEL_ALTO - 30))
 
-        self.screen.blit(s, self._panel_rect)
+        self._blit_panel()
 
     def _dibujar_audio(self, s):
         # Sliders

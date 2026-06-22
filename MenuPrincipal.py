@@ -8,11 +8,17 @@ Diseño:
 - Título grande centrado
 - Cuatro botones apilados verticalmente
 - Navegación con ratón y también con flechas + Enter
+
+Hereda de MenuBase la lógica de selección/navegación/click; aquí solo
+queda lo específico de este menú: el fondo a pantalla completa, el
+dibujado de los botones con su paleta propia, y la resolución especial
+de la opción 'config' (abre MenuConfig en vez de propagar la acción).
 """
 
 import pygame
 import Constantes
 import Fuentes
+from Menu import MenuBase
 from MenuConfig import MenuConfig
 from Import import obtener_ruta
 
@@ -29,7 +35,7 @@ COLOR_BTN_DISABLED  = (50,  50,  55)       # botón deshabilitado
 COLOR_TEXTO_DISABLED= (100, 100, 110)      # texto deshabilitado
 
 
-class MenuPrincipal:
+class MenuPrincipal(MenuBase):
     """Menú principal con cuatro opciones.
 
     Parameters
@@ -49,6 +55,8 @@ class MenuPrincipal:
         ('salir',    'Salir'),
     ]
 
+    ACCION_ESCAPE = 'salir'
+
     BTN_ANCHO  = 320
     BTN_ALTO   = 54
     BTN_GAP    = 18       # separación entre botones
@@ -57,12 +65,11 @@ class MenuPrincipal:
     def __init__(self, screen, tiene_save=False, audio=None,
              abrir_config=None,
                  fondo_path: str = obtener_ruta("Assets/Enviorments/Fondo Pantalla de inicio/background.png"),):
+        super().__init__(tiene_save=tiene_save)
 
         self._abrir_config = abrir_config or (lambda: MenuConfig(screen, audio).ejecutar())
 
-        self.screen     = screen
-        self.tiene_save = tiene_save
-        self.seleccion  = 0   # índice del botón resaltado con teclado
+        self.screen = screen
         self._audio = audio
 
         # Fuentes
@@ -92,31 +99,18 @@ class MenuPrincipal:
         inicio_y   = Constantes.HEIGHT // 2 - total_alto // 2 + 60  # +60 deja espacio al título
         cx         = Constantes.WIDTH  // 2
 
-        self._rects = []
-        for i in range(len(self.OPCIONES)):
-            y    = inicio_y + i * (self.BTN_ALTO + self.BTN_GAP)
-            rect = pygame.Rect(0, 0, self.BTN_ANCHO, self.BTN_ALTO)
-            rect.center = (cx, y)
-            self._rects.append(rect)
+        self._calcular_rects(cx, inicio_y, self.BTN_ANCHO, self.BTN_ALTO, self.BTN_GAP)
 
-    # ── Ayudas ──────────────────────────────────────────────────────────────
+    # ── Resolución especial de 'config' ─────────────────────────────────────
 
-    def _esta_deshabilitado(self, accion: str) -> bool:
-        if accion == 'cargar' and not self.tiene_save:
-            return True
-        return False
+    def _on_seleccionar(self, accion: str) -> str | None:
+        """'config' se resuelve aquí mismo (abre y vuelve) y no se propaga."""
+        if accion == 'config':
+            self._abrir_config()
+            return None
+        return accion
 
-    def hover_idx(self, mouse_pos) -> int:
-        """Devuelve el índice del botón bajo el ratón, o -1.
-
-        Misma API que MenuPausa.hover_idx(): el caller (Presenter o el
-        propio ejecutar()) la consulta cada frame con pygame.mouse.get_pos(),
-        en vez de que el menú escuche MOUSEMOTION internamente.
-        """
-        for i, rect in enumerate(self._rects):
-            if rect.collidepoint(mouse_pos):
-                return i
-        return -1
+    # ── Dibujo ──────────────────────────────────────────────────────────────
 
     def dibujar(self, hover_idx: int = -1):
         """Dibuja un frame completo del menú sobre self.screen.
@@ -195,51 +189,6 @@ class MenuPrincipal:
             (Constantes.WIDTH // 2 - pista.get_width() // 2,
              Constantes.HEIGHT - 36)
         )
-
-    # ── Procesar eventos ────────────────────────────────────────────────────
-
-    def procesar_evento(self, event) -> str | None:
-        """Procesa un evento pygame y devuelve la acción elegida o None.
-
-        Misma API que MenuPausa.procesar_evento(): no contiene loop ni
-        lee pygame.event.get() por sí mismo, así que puede ser pilotado
-        tanto por ejecutar() como por un Presenter externo si en el futuro
-        este menú se integra en el loop principal del juego.
-
-        Returns
-        -------
-        str or None
-            'jugar' | 'cargar' | 'salir', o None si el menú sigue abierto.
-            'config' se resuelve aquí mismo (abre y vuelve) y no se propaga.
-        """
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                return 'salir'
-
-            elif event.key in (pygame.K_DOWN, pygame.K_s):
-                self.seleccion = (self.seleccion + 1) % len(self.OPCIONES)
-
-            elif event.key in (pygame.K_UP, pygame.K_w):
-                self.seleccion = (self.seleccion - 1) % len(self.OPCIONES)
-
-            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                accion = self.OPCIONES[self.seleccion][0]
-                if not self._esta_deshabilitado(accion):
-                    if accion == 'config':
-                        self._abrir_config()
-                    else:
-                        return accion
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for rect, (accion, _) in zip(self._rects, self.OPCIONES):
-                if rect.collidepoint(event.pos):
-                    if not self._esta_deshabilitado(accion):
-                        if accion == 'config':
-                            self._abrir_config()
-                        else:
-                            return accion
-
-        return None
 
     # ── Loop de convenience (solo para el caso simple: main.py) ────────────
 
